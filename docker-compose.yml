@@ -23,16 +23,16 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://researcher:${DB_PASSWORD:-changeme}@db:5432/abduction_research
+      DATABASE_URL: postgresql://researcher:${DB_PASSWORD:-changeme}@db:5432/abduction_research
       SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ENVIRONMENT: ${ENVIRONMENT:-development}
+      STORAGE_PATH: /storage
     volumes:
       - ./backend:/app
       - ./storage:/storage
     ports:
       - "8000:8000"
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     image: node:20-alpine
@@ -43,7 +43,7 @@ services:
       - "3000:3000"
     command: sh -c "npm install && npm start"
     profiles:
-      - frontend  # Only started when explicitly included
+      - frontend  # only started when: docker compose --profile frontend up
 
 volumes:
   postgres_data:
