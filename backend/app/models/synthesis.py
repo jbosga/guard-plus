@@ -13,7 +13,7 @@ from app.models.enums import (
     HypothesisFramework, AssumedOntology, HypothesisStatus,
     EpistemicNoteType, AttachableEntityType,
 )
-from app.schemas.corpus import ClaimRead
+from app.models.corpus import ClaimRead
 
 
 # ── Concept ───────────────────────────────────────────────────────────────────

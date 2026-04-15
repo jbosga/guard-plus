@@ -8,8 +8,8 @@ from app.db.session import get_db
 from app.models.corpus import Claim, Source, PhenomenonTag
 from app.models.enums import EpistemicStatus, ClaimType
 from app.models.user import User
-from app.schemas.corpus import ClaimCreate, ClaimUpdate, ClaimRead, ClaimReview
-from app.schemas.common import Page
+from app.models.corpus import ClaimCreate, ClaimUpdate, ClaimRead, ClaimReview
+from app.models.common import Page
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/claims", tags=["claims"])
