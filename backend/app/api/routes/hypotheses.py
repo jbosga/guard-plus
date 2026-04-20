@@ -9,10 +9,10 @@ from app.models.synthesis import Hypothesis
 from app.models.corpus import Claim
 from app.models.enums import HypothesisFramework, HypothesisStatus
 from app.models.user import User
-from app.schemas.synthesis import (
+from app.models.synthesis import (
     HypothesisCreate, HypothesisUpdate, HypothesisList, HypothesisRead,
 )
-from app.schemas.common import Page
+from app.models.common import Page
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/hypotheses", tags=["hypotheses"])
@@ -62,7 +62,7 @@ def _to_list(h: Hypothesis) -> HypothesisList:
 
 
 def _to_read(h: Hypothesis) -> HypothesisRead:
-    from app.schemas.corpus import ClaimRead
+    from app.models.corpus import ClaimRead
     d = HypothesisRead.model_validate(h)
     d.supporting_claim_count = len(h.supporting_claims)
     d.anomalous_claim_count = len(h.anomalous_claims)

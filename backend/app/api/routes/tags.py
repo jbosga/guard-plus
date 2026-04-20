@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.models.corpus import PhenomenonTag
 from app.models.enums import TagCategory
 from app.models.user import User
-from app.schemas.corpus import PhenomenonTagCreate, PhenomenonTagUpdate, PhenomenonTagRead, PhenomenonTagTree
+from app.models.corpus import PhenomenonTagCreate, PhenomenonTagUpdate, PhenomenonTagRead, PhenomenonTagTree
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/tags", tags=["tags"])

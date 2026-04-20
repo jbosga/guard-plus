@@ -1,23 +1,135 @@
 """
-Pydantic schemas for the corpus layer (Sources, Accounts, Tags, Claims).
+SQLAlchemy ORM models and Pydantic schemas for the corpus layer.
 
-Naming convention:
+SQLAlchemy models: Source, Account, PhenomenonTag, Claim
+Pydantic schema naming convention:
   *Create  — request body for POST
   *Update  — request body for PATCH (all fields optional)
   *Read    — response body (includes id, timestamps)
   *List    — lightweight list-view response (omits heavy fields like raw_text)
 """
 from __future__ import annotations
+import uuid
 from datetime import date, datetime
 from typing import Optional, List
+
+from sqlalchemy import String, Text, Boolean, Integer, Enum, ForeignKey, Table, Column
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pydantic import BaseModel
 
+from app.db.base import Base, TimestampMixin
 from app.models.enums import (
     SourceType, DisciplinaryFrame, ProvenanceQuality,
     AccountContext, CorroborationLevel,
     EpistemicStatus, ClaimType,
     TagCategory,
 )
+
+
+# ── Association tables ────────────────────────────────────────────────────────
+
+claim_tags = Table(
+    "claim_tags",
+    Base.metadata,
+    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", UUID(as_uuid=True), ForeignKey("phenomenon_tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+# ── SQLAlchemy ORM models ─────────────────────────────────────────────────────
+
+class PhenomenonTag(Base, TimestampMixin):
+    __tablename__ = "phenomenon_tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    label: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    category: Mapped[TagCategory] = mapped_column(Enum(TagCategory, name="tag_category_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    definition: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    aliases: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    parent_tag_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("phenomenon_tags.id", ondelete="SET NULL"), nullable=True
+    )
+
+    parent_tag: Mapped[Optional["PhenomenonTag"]] = relationship(
+        "PhenomenonTag", remote_side="PhenomenonTag.id", back_populates="child_tags"
+    )
+    child_tags: Mapped[List["PhenomenonTag"]] = relationship("PhenomenonTag", back_populates="parent_tag")
+
+
+class Source(Base, TimestampMixin):
+    __tablename__ = "sources"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_type: Mapped[SourceType] = mapped_column(Enum(SourceType, name="source_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    title: Mapped[str] = mapped_column(String(1000), nullable=False)
+    authors: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    publication_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    doi: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    disciplinary_frame: Mapped[Optional[DisciplinaryFrame]] = mapped_column(
+        Enum(DisciplinaryFrame, name="disciplinary_frame_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=True
+    )
+    provenance_quality: Mapped[ProvenanceQuality] = mapped_column(
+        Enum(ProvenanceQuality, name="provenance_quality_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="unknown"
+    )
+    ingestion_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    raw_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_ref: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    claims: Mapped[List["Claim"]] = relationship("Claim", back_populates="source", cascade="all, delete-orphan")
+    account_detail: Mapped[Optional["Account"]] = relationship(
+        "Account", back_populates="source", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.id", ondelete="CASCADE"), primary_key=True
+    )
+    account_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    reporter_demographics: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    reporting_lag_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    context: Mapped[Optional[AccountContext]] = mapped_column(
+        Enum(AccountContext, name="account_context_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=True
+    )
+    corroboration: Mapped[CorroborationLevel] = mapped_column(
+        Enum(CorroborationLevel, name="corroboration_level_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="none"
+    )
+    hypnotic_regression: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+
+    source: Mapped["Source"] = relationship("Source", back_populates="account_detail")
+
+
+class Claim(Base, TimestampMixin):
+    __tablename__ = "claims"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    claim_text: Mapped[str] = mapped_column(Text, nullable=False)
+    verbatim: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    page_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    timestamp_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    epistemic_status: Mapped[EpistemicStatus] = mapped_column(
+        Enum(EpistemicStatus, name="epistemic_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="asserted"
+    )
+    claim_type: Mapped[ClaimType] = mapped_column(
+        Enum(ClaimType, name="claim_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
+    reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    reviewed_at: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    ai_extracted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+
+    source: Mapped["Source"] = relationship("Source", back_populates="claims")
+    tags: Mapped[List["PhenomenonTag"]] = relationship("PhenomenonTag", secondary=claim_tags)
 
 
 # ── PhenomenonTag ─────────────────────────────────────────────────────────────

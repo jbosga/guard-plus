@@ -10,10 +10,10 @@ from app.db.session import get_db
 from app.models.corpus import Source, Account, Claim
 from app.models.enums import SourceType, DisciplinaryFrame, ProvenanceQuality
 from app.models.user import User
-from app.schemas.corpus import (
+from app.models.corpus import (
     SourceCreate, SourceUpdate, SourceList, SourceRead, ClaimRead,
 )
-from app.schemas.common import Page
+from app.models.common import Page
 from app.core.security import get_current_user
 from app.core.config import get_settings
 

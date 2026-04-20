@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.models.synthesis import EpistemicNote
 from app.models.enums import AttachableEntityType, EpistemicNoteType
 from app.models.user import User
-from app.schemas.synthesis import EpistemicNoteCreate, EpistemicNoteRead
+from app.models.synthesis import EpistemicNoteCreate, EpistemicNoteRead
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/epistemic-notes", tags=["epistemic-notes"])

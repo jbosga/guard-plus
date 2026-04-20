@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -11,18 +11,17 @@ from app.core.config import get_settings
 from app.db.session import get_db
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 
 # ── Password ──────────────────────────────────────────────────────────────────
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 # ── Token ─────────────────────────────────────────────────────────────────────
@@ -45,7 +44,7 @@ def get_current_user(
     """FastAPI dependency: decode JWT → return User ORM object."""
     from app.models.corpus import Source  # avoid circular at module level
     # import here to avoid circular; User model defined in models package
-    from app.models import User
+    from app.models.user import User
 
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

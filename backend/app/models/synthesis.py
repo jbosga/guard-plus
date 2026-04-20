@@ -1,11 +1,19 @@
 """
-Pydantic schemas for the synthesis layer.
+SQLAlchemy ORM models and Pydantic schemas for the synthesis layer.
+
+SQLAlchemy models: Concept, ConceptRelationship, Hypothesis, EpistemicNote
 """
 from __future__ import annotations
+import uuid
 from datetime import datetime
 from typing import Optional, List
+
+from sqlalchemy import String, Text, Enum, ForeignKey, Table, Column
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pydantic import BaseModel, model_validator
 
+from app.db.base import Base, TimestampMixin
 from app.models.enums import (
     EpistemicStatus,
     ConceptType,
@@ -13,7 +21,135 @@ from app.models.enums import (
     HypothesisFramework, AssumedOntology, HypothesisStatus,
     EpistemicNoteType, AttachableEntityType,
 )
-from app.models.corpus import ClaimRead
+from app.models.corpus import Claim, ClaimRead
+
+
+# ── Association tables ────────────────────────────────────────────────────────
+
+concept_supporting_claims = Table(
+    "concept_supporting_claims",
+    Base.metadata,
+    Column("concept_id", UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE"), primary_key=True),
+    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+)
+
+relationship_supporting_claims = Table(
+    "relationship_supporting_claims",
+    Base.metadata,
+    Column("relationship_id", UUID(as_uuid=True), ForeignKey("concept_relationships.id", ondelete="CASCADE"), primary_key=True),
+    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+)
+
+hypothesis_scope_claims = Table(
+    "hypothesis_scope_claims",
+    Base.metadata,
+    Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
+    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+)
+
+hypothesis_supporting_claims = Table(
+    "hypothesis_supporting_claims",
+    Base.metadata,
+    Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
+    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+)
+
+hypothesis_anomalous_claims = Table(
+    "hypothesis_anomalous_claims",
+    Base.metadata,
+    Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
+    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+)
+
+hypothesis_competitors = Table(
+    "hypothesis_competitors",
+    Base.metadata,
+    Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
+    Column("competitor_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+# ── SQLAlchemy ORM models ─────────────────────────────────────────────────────
+
+class Concept(Base, TimestampMixin):
+    __tablename__ = "concepts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    label: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
+    concept_type: Mapped[ConceptType] = mapped_column(
+        Enum(ConceptType, name="concept_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    epistemic_status: Mapped[EpistemicStatus] = mapped_column(
+        Enum(EpistemicStatus, name="epistemic_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="asserted"
+    )
+
+    supporting_claims: Mapped[List[Claim]] = relationship("Claim", secondary=concept_supporting_claims)
+
+
+class ConceptRelationship(Base, TimestampMixin):
+    __tablename__ = "concept_relationships"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_concept_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_concept_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    relationship_type: Mapped[RelationshipType] = mapped_column(
+        Enum(RelationshipType, name="relationship_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True
+    )
+    strength: Mapped[Optional[RelationshipStrength]] = mapped_column(
+        Enum(RelationshipStrength, name="relationship_strength_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=True
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    supporting_claims: Mapped[List[Claim]] = relationship("Claim", secondary=relationship_supporting_claims)
+
+
+class Hypothesis(Base, TimestampMixin):
+    __tablename__ = "hypotheses"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    label: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    framework: Mapped[HypothesisFramework] = mapped_column(
+        Enum(HypothesisFramework, name="hypothesis_framework_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True
+    )
+    assumed_ontologies: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    required_assumptions: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[HypothesisStatus] = mapped_column(
+        Enum(HypothesisStatus, name="hypothesis_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="active", index=True
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    scope_claims: Mapped[List[Claim]] = relationship("Claim", secondary=hypothesis_scope_claims)
+    supporting_claims: Mapped[List[Claim]] = relationship("Claim", secondary=hypothesis_supporting_claims)
+    anomalous_claims: Mapped[List[Claim]] = relationship("Claim", secondary=hypothesis_anomalous_claims)
+    competing_hypotheses: Mapped[List["Hypothesis"]] = relationship(
+        "Hypothesis",
+        secondary=hypothesis_competitors,
+        primaryjoin=lambda: Hypothesis.id == hypothesis_competitors.c.hypothesis_id,
+        secondaryjoin=lambda: Hypothesis.id == hypothesis_competitors.c.competitor_id,
+    )
+
+
+class EpistemicNote(Base, TimestampMixin):
+    __tablename__ = "epistemic_notes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    attached_to_type: Mapped[AttachableEntityType] = mapped_column(
+        Enum(AttachableEntityType, name="attachable_entity_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
+    attached_to_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    note_type: Mapped[EpistemicNoteType] = mapped_column(
+        Enum(EpistemicNoteType, name="epistemic_note_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    author: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
 
 # ── Concept ───────────────────────────────────────────────────────────────────

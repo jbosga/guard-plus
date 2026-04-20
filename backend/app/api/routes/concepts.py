@@ -8,11 +8,11 @@ from app.models.synthesis import Concept, ConceptRelationship
 from app.models.corpus import Claim
 from app.models.enums import ConceptType, RelationshipType
 from app.models.user import User
-from app.schemas.synthesis import (
+from app.models.synthesis import (
     ConceptCreate, ConceptUpdate, ConceptRead,
     ConceptRelationshipCreate, ConceptRelationshipUpdate, ConceptRelationshipRead,
 )
-from app.schemas.common import Page
+from app.models.common import Page
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/concepts", tags=["concepts"])
