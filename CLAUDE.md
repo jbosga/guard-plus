@@ -199,7 +199,7 @@ Accepted claims → DB with reviewer + timestamp
 |---|---|---|
 | **Chat 1** | Project scaffolding, Docker Compose, PostgreSQL schema, SQLAlchemy models, Alembic migrations | **Done** |
 | **Chat 2** | FastAPI CRUD endpoints (Sources + Claims first), Pydantic schemas, JWT auth | **Done** |
-| **Chat 3** | Excel import script (pandas migration), schema validation against real data | — |
+| **Chat 3** | Excel import script (pandas migration), schema validation against real data | **Done** |
 | **Chat 4** | PDF ingestion pipeline backend (pymupdf, OCR, Claude API claim extraction) | — |
 | **Chat 5** | React frontend core (source list, source detail, claims list with filtering) | — |
 | **Chat 6** | Ingestion review queue UI (frontend for Chat 4 backend) | — |
@@ -222,6 +222,10 @@ Accepted claims → DB with reviewer + timestamp
 - `app/api/routes/auth.py`: register + login endpoints
 - `app/api/routes/sources.py`, `claims.py`, `tags.py`, `concepts.py`, `hypotheses.py`, `epistemic_notes.py`: full CRUD for all entities
 - `app/models/common.py`: shared Pydantic base schemas
+
+**Chat 3 — Excel Import**
+- `backend/import_excel.py`: pandas-based idempotent import script; reads `data_sheet.xlsx` (four sheets) and populates `sources`, `claims`, and `phenomenon_tags`; supports `--dry-run` and `--file` flags; skips rows whose `study_id` already exists
+- Bugfixes across models (`corpus.py`, `synthesis.py`, `user.py`), all CRUD routes, `security.py`, and `0001_initial_schema.py` to get the full stack running end-to-end
 
 ---
 
