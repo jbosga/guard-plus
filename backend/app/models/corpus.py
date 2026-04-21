@@ -220,7 +220,7 @@ class SourceUpdate(BaseModel):
 
 class SourceList(BaseModel):
     """Lightweight list view — no raw_text."""
-    id: int
+    id: uuid.UUID
     source_type: SourceType
     title: str
     authors: Optional[List[str]] = None
