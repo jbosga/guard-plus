@@ -139,7 +139,7 @@ class PhenomenonTagCreate(BaseModel):
     category: TagCategory
     definition: Optional[str] = None
     aliases: Optional[List[str]] = None
-    parent_tag_id: Optional[int] = None
+    parent_tag_id: Optional[uuid.UUID] = None
 
 
 class PhenomenonTagUpdate(BaseModel):
@@ -147,16 +147,16 @@ class PhenomenonTagUpdate(BaseModel):
     category: Optional[TagCategory] = None
     definition: Optional[str] = None
     aliases: Optional[List[str]] = None
-    parent_tag_id: Optional[int] = None
+    parent_tag_id: Optional[uuid.UUID] = None
 
 
 class PhenomenonTagRead(BaseModel):
-    id: int
+    id: uuid.UUID
     label: str
     category: TagCategory
     definition: Optional[str] = None
     aliases: Optional[List[str]] = None
-    parent_tag_id: Optional[int] = None
+    parent_tag_id: Optional[uuid.UUID] = None
 
     model_config = {"from_attributes": True}
 
@@ -247,7 +247,7 @@ class SourceRead(SourceList):
 # ── Claim ─────────────────────────────────────────────────────────────────────
 
 class ClaimCreate(BaseModel):
-    source_id: int
+    source_id: uuid.UUID
     claim_text: str
     verbatim: bool = False
     page_ref: Optional[str] = None
@@ -269,8 +269,8 @@ class ClaimUpdate(BaseModel):
 
 
 class ClaimRead(BaseModel):
-    id: int
-    source_id: int
+    id: uuid.UUID
+    source_id: uuid.UUID
     claim_text: str
     verbatim: bool
     page_ref: Optional[str] = None
