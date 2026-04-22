@@ -1,7 +1,7 @@
 import { client } from './client';
 import type {
   Token, Page,
-  SourceList, SourceRead, SourceCreate,
+  SourceList, SourceRead, SourceCreate, SourceUpdate,
   ClaimRead,
   HypothesisList,
   DisciplinaryFrame, ProvenanceQuality, SourceType,
@@ -44,6 +44,18 @@ export async function createSource(payload: SourceCreate): Promise<SourceRead> {
   return data;
 }
 
+export async function updateSource(id: string, payload: SourceUpdate): Promise<SourceRead> {
+  const { data } = await client.patch<SourceRead>(`/sources/${id}`, payload);
+  return data;
+}
+
+export async function uploadSourceFile(id: string, file: File): Promise<{ file_ref: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await client.post<{ file_ref: string }>(`/sources/${id}/upload`, form);
+  return data;
+}
+
 export async function deleteSource(id: string): Promise<void> {
   await client.delete(`/sources/${id}`);
 }
@@ -59,8 +71,8 @@ export interface ClaimsParams {
   page?: number;
   page_size?: number;
   source_id?: string;
-  epistemic_status?: EpistemicStatus;
-  claim_type?: ClaimType;
+  epistemic_status?: EpistemicStatus | EpistemicStatus[];
+  claim_type?: ClaimType | ClaimType[];
   ai_extracted?: boolean;
   unreviewed?: boolean;
   search?: string;

@@ -6,6 +6,19 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export const client = axios.create({
   baseURL: API_BASE,
+  paramsSerializer: {
+    serialize: (params) => {
+      const sp = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (Array.isArray(value)) {
+          for (const v of value) sp.append(key, String(v));
+        } else if (value !== undefined && value !== null) {
+          sp.append(key, String(value));
+        }
+      }
+      return sp.toString();
+    },
+  },
 });
 
 client.interceptors.request.use((config) => {

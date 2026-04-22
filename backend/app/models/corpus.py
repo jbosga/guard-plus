@@ -287,6 +287,7 @@ class ClaimUpdate(BaseModel):
 class ClaimRead(BaseModel):
     id: uuid.UUID
     source_id: uuid.UUID
+    source_title: Optional[str] = None
     claim_text: str
     verbatim: bool
     page_ref: Optional[str] = None

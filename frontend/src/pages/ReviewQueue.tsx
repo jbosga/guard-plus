@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getReviewQueue, reviewClaim } from '../api';
 import type { EpistemicStatus, ClaimType } from '../types';
@@ -27,11 +28,13 @@ const CT_OPTIONS: { value: ClaimType; label: string }[] = [
 
 export function ReviewQueue() {
   const [page] = useState(1);
+  const [searchParams] = useSearchParams();
+  const sourceId = searchParams.get('source_id') ?? undefined;
   const qc = useQueryClient();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['review-queue', page],
-    queryFn: () => getReviewQueue({ page, page_size: 20 }),
+    queryFn: () => getReviewQueue({ page, page_size: 20, source_id: sourceId }),
   });
 
   const mutation = useMutation({
@@ -117,6 +120,7 @@ interface ReviewCardProps {
     page_ref: string | null;
     verbatim: boolean;
     source_id: string;
+    source_title?: string;
   };
   index: number;
   onAccept: (overrides: { edited_text?: string; epistemic_status?: EpistemicStatus; claim_type?: ClaimType }) => void;
@@ -148,13 +152,31 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
       }}
     >
       {/* Badges */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
         <EpistemicBadge status={overrideStatus || claim.epistemic_status} />
         <ClaimTypeBadge type={overrideType || claim.claim_type} />
         {claim.page_ref && (
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
             p.{claim.page_ref}
           </span>
+        )}
+        {claim.source_title && (
+          <Link
+            to={`/sources/${claim.source_id}`}
+            style={{
+              marginLeft: 'auto',
+              fontFamily: 'var(--font-mono)', fontSize: 10,
+              color: 'var(--text-dim)',
+              textDecoration: 'none',
+              maxWidth: 280,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={claim.source_title}
+          >
+            ↗ {claim.source_title}
+          </Link>
         )}
       </div>
 

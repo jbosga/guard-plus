@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
@@ -14,6 +14,12 @@ from app.models.common import Page
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/claims", tags=["claims"])
+
+
+def _to_claim_read(claim: Claim) -> ClaimRead:
+    cr = ClaimRead.model_validate(claim)
+    cr.source_title = claim.source.title if claim.source else None
+    return cr
 
 
 def _get_or_404(claim_id: UUID, db: Session) -> Claim:
@@ -41,8 +47,8 @@ def list_claims(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     source_id: Optional[int] = None,
-    epistemic_status: Optional[EpistemicStatus] = None,
-    claim_type: Optional[ClaimType] = None,
+    epistemic_status: Optional[List[EpistemicStatus]] = Query(None),
+    claim_type: Optional[List[ClaimType]] = Query(None),
     tag_id: Optional[int] = Query(None, description="Filter to claims that carry this tag"),
     ai_extracted: Optional[bool] = None,
     unreviewed: Optional[bool] = Query(None, description="If true, return only unreviewed AI claims"),
@@ -55,9 +61,9 @@ def list_claims(
     if source_id is not None:
         q = q.filter(Claim.source_id == source_id)
     if epistemic_status:
-        q = q.filter(Claim.epistemic_status == epistemic_status)
+        q = q.filter(Claim.epistemic_status.in_(epistemic_status))
     if claim_type:
-        q = q.filter(Claim.claim_type == claim_type)
+        q = q.filter(Claim.claim_type.in_(claim_type))
     if tag_id is not None:
         q = q.filter(Claim.tags.any(PhenomenonTag.id == tag_id))
     if ai_extracted is not None:
@@ -65,7 +71,6 @@ def list_claims(
     if unreviewed:
         q = q.filter(Claim.ai_extracted == True, Claim.reviewed_at.is_(None))
     if search:
-        # Simple ilike for now; Chat 4 will wire up tsvector properly
         q = q.filter(Claim.claim_text.ilike(f"%{search}%"))
 
     total = q.count()
@@ -77,7 +82,7 @@ def list_claims(
     )
 
     return Page.create(
-        items=[ClaimRead.model_validate(c) for c in claims],
+        items=[_to_claim_read(c) for c in claims],
         total=total,
         page=page,
         page_size=page_size,
@@ -90,7 +95,7 @@ def list_claims(
 def review_queue(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    source_id: Optional[int] = None,
+    source_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -110,7 +115,7 @@ def review_queue(
     claims = q.order_by(Claim.created_at.asc()).offset((page - 1) * page_size).limit(page_size).all()
 
     return Page.create(
-        items=[ClaimRead.model_validate(c) for c in claims],
+        items=[_to_claim_read(c) for c in claims],
         total=total,
         page=page,
         page_size=page_size,
@@ -150,7 +155,7 @@ def create_claim(
     db.add(claim)
     db.commit()
     db.refresh(claim)
-    return ClaimRead.model_validate(claim)
+    return _to_claim_read(claim)
 
 
 # ── Read ──────────────────────────────────────────────────────────────────────
@@ -185,7 +190,7 @@ def update_claim(
 
     db.commit()
     db.refresh(claim)
-    return ClaimRead.model_validate(claim)
+    return _to_claim_read(claim)
 
 
 # ── Review (accept/edit/reject from queue) ────────────────────────────────────
@@ -227,7 +232,7 @@ def review_claim(
 
     db.commit()
     db.refresh(claim)
-    return ClaimRead.model_validate(claim)
+    return _to_claim_read(claim)
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────

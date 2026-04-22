@@ -1,26 +1,57 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSource, getSourceClaims, triggerIngest } from '../api';
+import { getSource, getSourceClaims, triggerIngest, updateSource, uploadSourceFile } from '../api';
+import type { DisciplinaryFrame, ProvenanceQuality, SourceRead } from '../types';
 import { AddClaimModal } from '../components/AddClaimModal';
 import {
   Page, Spinner, ErrorState, EmptyState,
   SourceTypeBadge, ProvenanceBadge, IngestionDot,
   EpistemicBadge, ClaimTypeBadge,
-  Button, Card, Stat, SectionHeader,
+  Button, Card, Stat, SectionHeader, Select, Input,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
+
+const DISCIPLINE_OPTIONS: { value: DisciplinaryFrame; label: string }[] = [
+  { value: 'neuroscience', label: 'Neuroscience' },
+  { value: 'psychology', label: 'Psychology' },
+  { value: 'folklore', label: 'Folklore' },
+  { value: 'physics', label: 'Physics' },
+  { value: 'parapsychology', label: 'Parapsychology' },
+  { value: 'sociology', label: 'Sociology' },
+  { value: 'anthropology', label: 'Anthropology' },
+  { value: 'psychiatry', label: 'Psychiatry' },
+  { value: 'ufology', label: 'Ufology' },
+  { value: 'philosophy', label: 'Philosophy' },
+  { value: 'other', label: 'Other' },
+];
+
+const PROVENANCE_OPTIONS: { value: ProvenanceQuality; label: string }[] = [
+  { value: 'peer_reviewed', label: 'Peer reviewed' },
+  { value: 'grey_literature', label: 'Grey literature' },
+  { value: 'anecdotal', label: 'Anecdotal' },
+  { value: 'investigator_report', label: 'Investigator report' },
+  { value: 'self_reported', label: 'Self reported' },
+  { value: 'unknown', label: 'Unknown' },
+];
 
 export function SourceDetail() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [ingestError, setIngestError] = useState('');
   const [showAddClaim, setShowAddClaim] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: source, isLoading, isError } = useQuery({
     queryKey: ['source', id],
     queryFn: () => getSource(id!),
     enabled: !!id,
+    refetchInterval: (query) => {
+      const status = query.state.data?.ingestion_status;
+      return status === 'processing' || status === 'pending' ? 3000 : false;
+    },
   });
 
   const { data: claims, isLoading: claimsLoading } = useQuery({
@@ -38,6 +69,18 @@ export function SourceDetail() {
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setIngestError(msg ?? 'Ingestion failed');
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => uploadSourceFile(id!, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['source', id] });
+      setUploadError('');
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setUploadError(msg ?? 'Upload failed');
     },
   });
 
@@ -112,7 +155,6 @@ export function SourceDetail() {
                   <p style={{
                     fontSize: 13,
                     fontFamily: claim.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
-                    fontStyle: claim.verbatim ? 'normal' : 'normal',
                     color: 'var(--text-primary)',
                     lineHeight: 1.6,
                   }}>
@@ -137,7 +179,7 @@ export function SourceDetail() {
               ))}
             </div>
 
-            {/* Raw text preview */}
+            {/* Notes */}
             {source.notes && (
               <div>
                 <SectionHeader>Notes</SectionHeader>
@@ -163,49 +205,76 @@ export function SourceDetail() {
 
             {/* Metadata */}
             <Card style={{ padding: 'var(--space-4)' }}>
-              <SectionHeader>Metadata</SectionHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                <MetaRow label="Type"><SourceTypeBadge type={source.source_type} /></MetaRow>
-                <MetaRow label="Provenance"><ProvenanceBadge quality={source.provenance_quality} /></MetaRow>
-                {source.disciplinary_frame && (
-                  <MetaRow label="Discipline">
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-                      {source.disciplinary_frame.replace(/_/g, ' ')}
-                    </span>
-                  </MetaRow>
-                )}
-                {source.doi && (
-                  <MetaRow label="DOI">
-                    <a
-                      href={`https://doi.org/${source.doi}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}
-                    >
-                      {source.doi}
-                    </a>
-                  </MetaRow>
-                )}
-                {source.url && (
-                  <MetaRow label="URL">
-                    <a
-                      href={source.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}
-                    >
-                      ↗ link
-                    </a>
-                  </MetaRow>
-                )}
-                {source.file_ref && (
-                  <MetaRow label="File">
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-                      {source.file_ref.split('_').slice(1).join('_')}
-                    </span>
-                  </MetaRow>
-                )}
-              </div>
+              <SectionHeader action={
+                <button
+                  onClick={() => setEditing(e => !e)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    color: editing ? 'var(--accent)' : 'var(--text-dim)',
+                    padding: '2px 6px',
+                  }}
+                >
+                  {editing ? 'cancel' : 'edit'}
+                </button>
+              }>
+                Metadata
+              </SectionHeader>
+
+              {editing ? (
+                <EditMetadataForm
+                  source={source}
+                  onSaved={() => {
+                    setEditing(false);
+                    qc.invalidateQueries({ queryKey: ['source', id] });
+                    qc.invalidateQueries({ queryKey: ['sources'] });
+                  }}
+                  onCancel={() => setEditing(false)}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <MetaRow label="Type"><SourceTypeBadge type={source.source_type} /></MetaRow>
+                  <MetaRow label="Provenance"><ProvenanceBadge quality={source.provenance_quality} /></MetaRow>
+                  {source.disciplinary_frame && (
+                    <MetaRow label="Discipline">
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {source.disciplinary_frame.replace(/_/g, ' ')}
+                      </span>
+                    </MetaRow>
+                  )}
+                  {source.doi && (
+                    <MetaRow label="DOI">
+                      <a
+                        href={`https://doi.org/${source.doi}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                      >
+                        {source.doi}
+                      </a>
+                    </MetaRow>
+                  )}
+                  {source.url && (
+                    <MetaRow label="URL">
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                      >
+                        ↗ link
+                      </a>
+                    </MetaRow>
+                  )}
+                  {source.file_ref && (
+                    <MetaRow label="File">
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {source.file_ref.split('_').slice(1).join('_')}
+                      </span>
+                    </MetaRow>
+                  )}
+                </div>
+              )}
             </Card>
 
             {/* Ingestion */}
@@ -230,10 +299,34 @@ export function SourceDetail() {
                 )}
 
                 {ingestError && (
-                  <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--status-error)',
-                  }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--status-error)' }}>
                     ✗ {ingestError}
+                  </div>
+                )}
+
+                {/* File upload */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt,.doc,.docx"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadMutation.mutate(file);
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  size="sm"
+                  disabled={uploadMutation.isPending}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadMutation.isPending ? 'uploading…' : source.file_ref ? '↑ replace file' : '↑ upload file'}
+                </Button>
+
+                {uploadError && (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--status-error)' }}>
+                    ✗ {uploadError}
                   </div>
                 )}
 
@@ -261,9 +354,25 @@ export function SourceDetail() {
                   <p style={{
                     fontFamily: 'var(--font-mono)', fontSize: 10,
                     color: 'var(--status-info)', lineHeight: 1.6,
+                    display: 'flex', alignItems: 'center', gap: 6,
                   }}>
-                    Pipeline running. Claims appear in the review queue as extracted.
+                    <span className="dot" style={{ background: 'var(--status-info)', flexShrink: 0 }} />
+                    Pipeline running — polling every 3s
                   </p>
+                )}
+
+                {source.ingestion_status === 'complete' && (
+                  <Link
+                    to={`/review?source_id=${source.id}`}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: 'var(--accent)',
+                      textDecoration: 'none',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    → review extracted claims
+                  </Link>
                 )}
               </div>
             </Card>
@@ -305,6 +414,130 @@ export function SourceDetail() {
     </Shell>
   );
 }
+
+// ── Edit metadata form ────────────────────────────────────────────────────────
+
+function EditMetadataForm({
+  source,
+  onSaved,
+  onCancel,
+}: {
+  source: SourceRead;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(source.title);
+  const [authors, setAuthors] = useState(source.authors?.join(', ') ?? '');
+  const [publicationDate, setPublicationDate] = useState(source.publication_date ?? '');
+  const [url, setUrl] = useState(source.url ?? '');
+  const [doi, setDoi] = useState(source.doi ?? '');
+  const [discipline, setDiscipline] = useState<DisciplinaryFrame | ''>(source.disciplinary_frame ?? '');
+  const [provenance, setProvenance] = useState<ProvenanceQuality>(source.provenance_quality);
+  const [notes, setNotes] = useState(source.notes ?? '');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () => updateSource(source.id, {
+      title: title.trim() || undefined,
+      authors: authors.trim() ? authors.split(',').map(a => a.trim()).filter(Boolean) : undefined,
+      publication_date: publicationDate.trim() || undefined,
+      url: url.trim() || undefined,
+      doi: doi.trim() || undefined,
+      disciplinary_frame: (discipline as DisciplinaryFrame) || undefined,
+      provenance_quality: provenance,
+      notes: notes.trim() || undefined,
+    }),
+    onSuccess: onSaved,
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(msg ?? 'Save failed');
+    },
+  });
+
+  const fieldStyle: React.CSSProperties = {
+    background: 'var(--bg-0)',
+    border: '1px solid var(--border-dim)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    padding: '4px 8px',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Title</span>
+        <input value={title} onChange={e => setTitle(e.target.value)} style={fieldStyle} />
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Authors (comma-separated)</span>
+        <input value={authors} onChange={e => setAuthors(e.target.value)} style={fieldStyle} />
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Date</span>
+        <input value={publicationDate} onChange={e => setPublicationDate(e.target.value)} placeholder="e.g. 1987 or 1987-03-15" style={fieldStyle} />
+      </label>
+
+      <Select
+        label="Discipline"
+        options={DISCIPLINE_OPTIONS}
+        placeholder="— none —"
+        value={discipline}
+        onChange={e => setDiscipline(e.target.value as DisciplinaryFrame | '')}
+        style={{ fontSize: 11 }}
+      />
+
+      <Select
+        label="Provenance"
+        options={PROVENANCE_OPTIONS}
+        value={provenance}
+        onChange={e => setProvenance(e.target.value as ProvenanceQuality)}
+        style={{ fontSize: 11 }}
+      />
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>URL</span>
+        <input value={url} onChange={e => setUrl(e.target.value)} style={fieldStyle} />
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>DOI</span>
+        <input value={doi} onChange={e => setDoi(e.target.value)} style={fieldStyle} />
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notes</span>
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          rows={3}
+          style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
+        />
+      </label>
+
+      {error && (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--status-error)' }}>
+          ✗ {error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <Button size="sm" variant="primary" disabled={mutation.isPending || !title.trim()} onClick={() => mutation.mutate()}>
+          {mutation.isPending ? 'saving…' : 'save'}
+        </Button>
+        <Button size="sm" disabled={mutation.isPending} onClick={onCancel}>cancel</Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (

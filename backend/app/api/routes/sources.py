@@ -221,4 +221,5 @@ def get_source_claims(
         .order_by(Claim.page_ref)
         .all()
     )
-    return [ClaimRead.model_validate(c) for c in claims]
+    from app.api.routes.claims import _to_claim_read
+    return [_to_claim_read(c) for c in claims]

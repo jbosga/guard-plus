@@ -110,6 +110,17 @@ export interface SourceCreate {
   notes?: string;
 }
 
+export interface SourceUpdate {
+  title?: string;
+  authors?: string[];
+  publication_date?: string;
+  url?: string;
+  doi?: string;
+  disciplinary_frame?: DisciplinaryFrame;
+  provenance_quality?: ProvenanceQuality;
+  notes?: string;
+}
+
 // ── Tags ──────────────────────────────────────────────────────────────────────
 
 export interface PhenomenonTagRead {
@@ -126,6 +137,7 @@ export interface PhenomenonTagRead {
 export interface ClaimRead {
   id: string;
   source_id: string;
+  source_title?: string;
   claim_text: string;
   verbatim: boolean;
   page_ref: string | null;
