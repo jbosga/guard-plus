@@ -315,4 +315,5 @@ class ClaimReview(BaseModel):
     accepted: bool
     edited_text: Optional[str] = None
     epistemic_status: Optional[EpistemicStatus] = None
+    claim_type: Optional[ClaimType] = None
     tag_ids: Optional[List[int]] = None
