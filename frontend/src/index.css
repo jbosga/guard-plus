@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Surfaces */
+  --bg-0: #ffffff;
+  --bg-1: #f6f8fa;
+  --bg-2: #eaeef2;
+  --bg-3: #d0d7de;
+
+  /* Borders */
+  --border-dim: #d0d7de;
+  --border-mid: #b9c0c9;
+  --border-hi:  #8c959f;
+
+  /* Text */
+  --text-primary:   #1f2328;
+  --text-secondary: #636c76;
+  --text-dim:       #9198a1;
+  --text-inverse:   #ffffff;
+
+  /* Accent — GitHub blue */
+  --accent:     #0969da;
+  --accent-dim: #cfe8ff;
+  --accent-bg:  #ddf4ff;
+
+  /* Status */
+  --status-ok:    #1a7f37;
+  --status-ok-bg: #dafbe1;
+  --status-warn:    #9a6700;
+  --status-warn-bg: #fff8c5;
+  --status-error:    #d1242f;
+  --status-error-bg: #ffebe9;
+  --status-info:    #0969da;
+  --status-info-bg: #ddf4ff;
+  --status-dim:     #9198a1;
+
+  /* Epistemic status */
+  --ep-asserted:    #636c76;
+  --ep-observed:    #1a7f37;
+  --ep-inferred:    #0969da;
+  --ep-speculative: #8250df;
+  --ep-contested:   #9a6700;
+  --ep-retracted:   #d1242f;
+
+  /* Claim types */
+  --ct-phenomenological: #0969da;
+  --ct-causal:           #9a6700;
+  --ct-correlational:    #1a7f37;
+  --ct-definitional:     #8250df;
+  --ct-methodological:   #636c76;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+
+  /* Spacing */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  /* Transitions */
+  --t-fast: 80ms ease; --t-mid: 160ms ease;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 3px rgba(31,35,40,0.08), 0 0 0 1px rgba(31,35,40,0.06);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--bg-1);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font-family: var(--font-sans); cursor: pointer; }
+input, textarea, select { font-family: var(--font-sans); font-size: 14px; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+
+.mono    { font-family: var(--font-mono); }
+.dim     { color: var(--text-secondary); }
+.dimmer  { color: var(--text-dim); }
+.accent  { color: var(--accent); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 180ms ease forwards; }

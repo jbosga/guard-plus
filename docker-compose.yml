@@ -39,11 +39,16 @@ services:
     working_dir: /app
     volumes:
       - ./frontend:/app
+      - /app/node_modules    # anonymous volume: container node_modules, not host's
     ports:
       - "3000:3000"
-    command: sh -c "npm install && npm start"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
+    command: sh -c "npm install && npm run dev"
     profiles:
-      - frontend  # only started when: docker compose --profile frontend up
+      - frontend
 
 volumes:
   postgres_data:
