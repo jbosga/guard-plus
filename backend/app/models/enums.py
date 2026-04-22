@@ -128,3 +128,16 @@ class AttachableEntityType(str, enum.Enum):
     HYPOTHESIS = "hypothesis"
     CONCEPT_RELATIONSHIP = "concept_relationship"
     SOURCE = "source"
+
+# ── Phase 4 additions ─────────────────────────────────────────────────────────
+
+class IngestionStatus(str, enum.Enum):
+    PENDING = "pending"       # file uploaded, ingest not yet triggered
+    PROCESSING = "processing" # pipeline running
+    COMPLETE = "complete"     # claims written, ready for review (AI) or done (manual)
+    FAILED = "failed"         # pipeline error; see source.ingestion_error
+
+class IngestionMethod(str, enum.Enum):
+    AI = "ai"                 # Claude API extraction → review queue
+    MANUAL = "manual"         # researcher enters claims directly
+    BULK_IMPORT = "bulk_import"  # Excel import script (retroactively labelled)

@@ -24,6 +24,7 @@ from app.models.enums import (
     AccountContext, CorroborationLevel,
     EpistemicStatus, ClaimType,
     TagCategory,
+    IngestionStatus, IngestionMethod,  # Phase 4
 )
 
 
@@ -78,6 +79,13 @@ class Source(Base, TimestampMixin):
     raw_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     file_ref: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Phase 4 additions
+    ingestion_status: Mapped[Optional[IngestionStatus]] = mapped_column(
+        Enum(IngestionStatus, name="ingestion_status_enum", create_type=False,
+             values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    ingestion_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     claims: Mapped[List["Claim"]] = relationship("Claim", back_populates="source", cascade="all, delete-orphan")
     account_detail: Mapped[Optional["Account"]] = relationship(
@@ -127,6 +135,12 @@ class Claim(Base, TimestampMixin):
     reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     reviewed_at: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     ai_extracted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Phase 4: richer provenance than the bool above
+    ingestion_method: Mapped[Optional[IngestionMethod]] = mapped_column(
+        Enum(IngestionMethod, name="ingestion_method_enum", create_type=False,
+             values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
 
     source: Mapped["Source"] = relationship("Source", back_populates="claims")
     tags: Mapped[List["PhenomenonTag"]] = relationship("PhenomenonTag", secondary=claim_tags)
@@ -228,6 +242,7 @@ class SourceList(BaseModel):
     disciplinary_frame: Optional[DisciplinaryFrame] = None
     provenance_quality: ProvenanceQuality
     ingestion_date: Optional[str] = None
+    ingestion_status: Optional[IngestionStatus] = None  # Phase 4
     claim_count: int = 0
 
     model_config = {"from_attributes": True}
@@ -239,6 +254,7 @@ class SourceRead(SourceList):
     doi: Optional[str] = None
     file_ref: Optional[str] = None
     notes: Optional[str] = None
+    ingestion_error: Optional[str] = None  # Phase 4: surface pipeline errors
     account_detail: Optional[AccountDetailRead] = None
     created_at: datetime
     updated_at: datetime
@@ -278,6 +294,7 @@ class ClaimRead(BaseModel):
     epistemic_status: EpistemicStatus
     claim_type: ClaimType
     ai_extracted: bool
+    ingestion_method: Optional[IngestionMethod] = None  # Phase 4
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[str] = None
     tags: List[PhenomenonTagRead] = []
