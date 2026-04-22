@@ -25,7 +25,7 @@ The Claim layer is the critical intermediary — most tools collapse this, losin
 |---|---|---|
 | Database | PostgreSQL 16 | Relational model required; full-text search, JSONB, recursive queries for tag hierarchy |
 | Backend | Python + FastAPI | Clean REST API, Pydantic validation, Python AI/NLP ecosystem |
-| Frontend | React | Mature ecosystem for graph viz and complex UI |
+| Frontend | React + Vite + TypeScript | Mature ecosystem for graph viz and complex UI |
 | Graph viz | Cytoscape.js | Better than vis.js for analytical filtering and programmatic graph analysis |
 | AI assistance | Anthropic Claude API | Claim extraction, pattern detection, hypothesis stress-testing |
 | Infrastructure | Docker Compose | One-command startup; clean path to VPS deployment |
@@ -33,7 +33,7 @@ The Claim layer is the critical intermediary — most tools collapse this, losin
 
 ### Deployment target
 
-Web app (not desktop). Initially single-user, designed for multi-user from the start. Auth layer added in Phase 1 even if unused, to avoid painful retrofit.
+Web app (not desktop). Initially single-user, designed for multi-user from the start.
 
 ---
 
@@ -43,39 +43,40 @@ Web app (not desktop). Initially single-user, designed for multi-user from the s
 
 ```
 Source
-├── id
+├── id (UUID)
 ├── type: [account | paper | book | interview | media | field_report]
 ├── title, author(s), date, url/doi
 ├── disciplinary_frame: [neuroscience | psychology | folklore | physics | 
-│                         parapsychology | sociology | ...]
+│                         parapsychology | sociology | anthropology | psychiatry | ufology | philosophy | other]
 ├── provenance_quality: [peer_reviewed | grey_literature | anecdotal | 
-│                        investigator_report | ...]
-├── ingestion_date
+│                        investigator_report | self_reported | unknown]
+├── ingestion_date, ingestion_status, ingestion_error
 ├── raw_text          ← stored in DB for re-analysis
 ├── file_ref          ← path to original file
 └── notes
 
-Account (extends Source)
-├── account_date      ← when event occurred (vs. when reported)
-├── reporter_demographics: [age, location, background]
-├── reporting_lag     ← time between event and account
-├── context: [sleep | wake | hypnagogic | altered_state | ...]
-└── corroboration: [none | witness | physical_trace | investigator]
+Account (extends Source, 1:1)
+├── account_date
+├── reporter_demographics (JSONB)
+├── reporting_lag_days
+├── context: [sleep | wake | hypnagogic | hypnopompic | altered_state | full_consciousness | unknown]
+└── corroboration: [none | witness | physical_trace | investigator | multiple]
 ```
 
 ### Claim (middle tier — do not collapse into Source)
 
 ```
 Claim
-├── id
+├── id (UUID)
 ├── source_id         (FK → Source)
 ├── claim_text
 ├── verbatim: boolean
-├── page_ref / timestamp
-├── epistemic_status: [asserted | observed | inferred | speculative | 
-│                      contested | retracted]
-├── claim_type: [phenomenological | causal | correlational | 
-│                definitional | methodological]
+├── page_ref / timestamp_ref
+├── epistemic_status: [asserted | observed | inferred | speculative | contested | retracted]
+├── claim_type: [phenomenological | causal | correlational | definitional | methodological]
+├── ai_extracted: boolean
+├── ingestion_method: [ai | manual | bulk_import]
+├── reviewed_by / reviewed_at
 └── tags[]            (FK → PhenomenonTag)
 ```
 
@@ -83,75 +84,45 @@ Claim
 
 ```
 PhenomenonTag
-├── id
-├── label             (e.g. "missing_time", "entity_contact")
-├── category: [perceptual | somatic | cognitive | narrative | 
-│              environmental | emotional]
-├── definition
-├── aliases[]
-└── parent_tag        (FK → PhenomenonTag)  ← hierarchy
+├── id (UUID)
+├── label, category, definition, aliases[]
+└── parent_tag_id     ← hierarchy
 ```
 
-Hierarchy example: `entity_contact` → `entity_communication` → `entity_medical_procedure`
-
-### Concept (knowledge graph node)
+### Concept + ConceptRelationship (knowledge graph)
 
 ```
 Concept
-├── id
-├── label
-├── concept_type: [phenomenon | mechanism | entity | location | 
-│                  process | theoretical_construct]
-├── description
-├── epistemic_status
-└── supporting_claims[] (FK → Claim)
+├── id (UUID), label, concept_type, description, epistemic_status
+└── supporting_claims[]
 
 ConceptRelationship
-├── source_concept_id
-├── target_concept_id
-├── relationship_type: [correlates_with | precedes | causes | contradicts | 
-│                       is_instance_of | co-occurs_with | is_explained_by | 
-│                       anomalous_given]    ← key type: flags unexplained tensions
+├── source_concept_id, target_concept_id
+├── relationship_type: [..., anomalous_given]    ← key: flags unexplained tensions
 ├── strength: [weak | moderate | strong]
-├── supporting_claims[]
-└── notes
+└── supporting_claims[]
 ```
 
 ### Hypothesis (synthesis workspace)
 
 ```
 Hypothesis
-├── id
-├── label
-├── description
+├── id (UUID), label, description
 ├── framework: [neurological | psychological | sociocultural | physical | 
-│               interdimensional | information-theoretic | ...]
-├── assumed_ontology[]: [physicalism | dualism | panpsychism | idealism | 
-│                        unknown | novel]   ← makes paradigm assumptions explicit
+│               interdimensional | information_theoretic | psychospiritual | unknown]
+├── assumed_ontologies[]: [physicalism | dualism | panpsychism | idealism | unknown | novel]
 ├── scope_claims[]        ← what it purports to explain
 ├── supporting_claims[]   ← evidence in favor
 ├── anomalous_claims[]    ← REQUIRED: evidence it cannot explain (anti-bias mechanism)
-├── required_assumptions[]
-├── competing_hypotheses[] (FK → Hypothesis)
-├── status: [active | abandoned | merged | speculative]
-└── notes
+├── competing_hypotheses[]
+└── status: [active | abandoned | merged | speculative]
 ```
 
-**Note:** `anomalous_claims` is structurally enforced — every hypothesis must account for what it fails to explain.
+**`anomalous_claims` is structurally enforced** — the API emits `X-Warning` and the UI shows a red warning when this list is empty.
 
 ### EpistemicNote (global annotation layer)
 
-```
-EpistemicNote
-├── attached_to_type  (Claim | Concept | Hypothesis | ConceptRelationship)
-├── attached_to_id
-├── note_type: [methodological_concern | replication | contradiction | 
-│               update | personal_observation]
-├── text
-└── author + date
-```
-
-Annotate anything without polluting primary records.
+Attaches to any entity (Claim | Concept | Hypothesis | ConceptRelationship | Source) without polluting primary records.
 
 ---
 
@@ -160,36 +131,30 @@ Annotate anything without polluting primary records.
 ### Principles
 
 - **AI-assisted human curation**, not full automation
-- Silent errors are worse than slow throughput for a project where epistemic integrity is foundational
-- Claude API suggests; human reviewer confirms before claims enter the database
+- Silent errors are worse than slow throughput
+- Claude API suggests; human reviewer confirms before claims enter the corpus
 
 ### Source types and approach
 
 | Source type | Extraction method |
 |---|---|
 | Modern PDFs (text-selectable) | `pymupdf` → Claude API claim extraction |
-| Scanned/old PDFs | Tesseract OCR (MVP) or Google Document AI (hard cases) → same pipeline |
-| Excel (existing data) | pandas one-time migration script → map to schema |
-| Narrative witness accounts | Claude API with phenomenology-specific prompt; expect more review time |
+| Scanned PDFs | Tesseract OCR fallback → same pipeline |
+| Excel (existing data) | `import_excel.py` one-time migration script |
 
-### Ingestion review queue (UI flow)
+### Ingestion flow
 
 ```
-Upload file
+Upload file → POST /{source_id}/upload
     ↓
-Automated extraction (OCR if needed → Claude API JSON output)
+Trigger AI extraction → POST /{source_id}/ingest  { method: "ai" }
+    ↓  (returns 202, runs as BackgroundTask)
+Poll GET /sources/{source_id} for ingestion_status
+    ↓  (complete)
+Review queue: GET /claims/review-queue
     ↓
-Review queue: extracted claims presented one by one
-  [Accept] [Edit] [Reject] [Flag for later]
-    ↓
-Accepted claims → DB with reviewer + timestamp
+POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status? }
 ```
-
-### Storage
-
-- Raw text: stored in PostgreSQL (enables re-analysis as prompts improve)
-- Original files: stored in `storage/` directory (filesystem for MVP, S3 later)
-- At projected scale (100–10,000 documents), total storage well under 1GB — no scaling concerns
 
 ---
 
@@ -197,65 +162,93 @@ Accepted claims → DB with reviewer + timestamp
 
 | Phase | Scope | Status |
 |---|---|---|
-| **Chat 1** | Project scaffolding, Docker Compose, PostgreSQL schema, SQLAlchemy models, Alembic migrations | **Done** |
-| **Chat 2** | FastAPI CRUD endpoints (Sources + Claims first), Pydantic schemas, JWT auth | **Done** |
-| **Chat 3** | Excel import script (pandas migration), schema validation against real data | **Done** |
-| **Chat 4** | PDF ingestion pipeline backend (pymupdf, OCR, Claude API claim extraction) | **Done** |
-| **Chat 5** | React frontend core (source list, source detail, claims list with filtering) | — |
-| **Chat 6** | Ingestion review queue UI (frontend for Chat 4 backend) | — |
+| **Chat 1** | Project scaffolding, Docker Compose, PostgreSQL schema, SQLAlchemy models, Alembic migrations | ✅ Done |
+| **Chat 2** | FastAPI CRUD endpoints, Pydantic schemas, JWT auth | ✅ Done |
+| **Chat 3** | Excel import script (`import_excel.py`) | ✅ Done |
+| **Chat 4** | PDF ingestion pipeline (pymupdf, OCR, Claude API claim extraction) | ✅ Done |
+| **Chat 5** | React frontend core (source list, source detail, claims list, review queue skeleton, hypotheses list) | ✅ Done |
+| **Chat 6** | Ingestion review queue UI (full reviewer UX) | — |
 | **Chat 7** | Knowledge graph view (Cytoscape.js) | — |
 | **Chat 8** | Hypothesis workspace (synthesis layer) | — |
 
-### What was built
+---
 
-**Chat 1 — Scaffolding**
+## What Was Built
+
+### Chat 1 — Scaffolding
 - `docker-compose.yml`: `db` (postgres:16-alpine) + `backend` (FastAPI) + `frontend` (profile-gated)
-- `backend/` directory: Dockerfile, `requirements.txt`, `app/` package
-- `app/db/base.py`: `Base` + `TimestampMixin`; `app/db/session.py`: async engine + `get_db` dependency
-- `app/core/config.py`: `Settings` via pydantic-settings
-- `app/models/enums.py`, `corpus.py`, `synthesis.py`: full SQLAlchemy model set (all layers)
-- `alembic/`: async env, `0001_initial_schema.py` (all tables, enums, FTS indexes, updated_at trigger)
+- `backend/app/db/base.py`: `Base` + `TimestampMixin`
+- `backend/app/core/config.py`: `Settings` via pydantic-settings
+- `backend/app/models/enums.py`, `corpus.py`, `synthesis.py`: full SQLAlchemy model set
+- `alembic/versions/0001_initial_schema.py`: all tables, enums, FTS indexes, `updated_at` trigger
 
-**Chat 2 — CRUD + Auth**
-- `app/models/user.py`: `User` model; `0002_add_users_table.py` migration
-- `app/core/security.py`: JWT creation/verification, bcrypt password hashing
-- `app/api/routes/auth.py`: register + login endpoints
-- `app/api/routes/sources.py`, `claims.py`, `tags.py`, `concepts.py`, `hypotheses.py`, `epistemic_notes.py`: full CRUD for all entities
-- `app/models/common.py`: shared Pydantic base schemas
+### Chat 2 — CRUD + Auth
+- `backend/app/models/user.py`: `User` model; `0002_add_users_table.py`
+- `backend/app/core/security.py`: JWT + bcrypt
+- `backend/app/api/routes/`: auth, sources, claims, tags, concepts, hypotheses, epistemic_notes
 
-**Chat 3 — Excel Import**
-- `backend/import_excel.py`: pandas-based idempotent import script; reads `data_sheet.xlsx` (four sheets) and populates `sources`, `claims`, and `phenomenon_tags`; supports `--dry-run` and `--file` flags; skips rows whose `study_id` already exists
-- Bugfixes across models (`corpus.py`, `synthesis.py`, `user.py`), all CRUD routes, `security.py`, and `0001_initial_schema.py` to get the full stack running end-to-end
+### Chat 3 — Excel Import
+- `backend/import_excel.py`: idempotent import, `--dry-run` flag, 51 sources + claims
 
-**Chat 4 — PDF Ingestion Pipeline**
-- `app/services/ingestion.py`: full ingestion service — pymupdf text extraction with per-page Tesseract OCR fallback (threshold: <100 chars), Claude API claim extraction (`claude-sonnet-4-20250514`), atomic bulk claim insertion, `ingestion_status` lifecycle management; errors written to `source.ingestion_error`, never silently swallowed; text capped at 120k chars (~30k tokens) as cost guardrail; max 100 claims per source as over-segmentation guard
-- `app/api/routes/ingest.py`: `POST /api/v1/sources/{source_id}/ingest` — two paths: **AI path** (returns 202, runs pipeline in BackgroundTask, poll source for status); **manual path** (if `claims[]` provided: inserts immediately and returns 201; if no claims: returns 200 with source metadata for frontend form in Chat 6); text extraction runs for both paths
-- `alembic/versions/0003_add_ingestion_fields.py`: adds `ingestion_status`, `ingestion_method`, `ingestion_error`, `ai_extracted` flag on claims, and new `IngestionStatus`/`IngestionMethod` enums
-- `app/models/enums.py`, `app/models/corpus.py`: extended with ingestion enums and fields
-- Bugfixes to `app/services/ingestion.py` and `app/api/routes/sources.py` (Chat 4 follow-up)
+### Chat 4 — PDF Ingestion Pipeline
+- `backend/app/services/ingestion.py`: pymupdf + Tesseract OCR + Claude API extraction
+- `backend/app/api/routes/ingest.py`: `POST /sources/{id}/ingest` (AI: 202+background; manual: immediate)
+- `alembic/versions/0003_add_ingestion_fields.py`: `ingestion_status`, `ingestion_method`, `ingestion_error`
+
+### Chat 5 — React Frontend
+- `frontend/` — Vite + React 18 + TypeScript, zero CRA remnants
+- **Design system:** IBM Plex Mono/Sans/Serif, dark instrument aesthetic, CSS custom properties
+- **`src/types/index.ts`** — full TypeScript types mirroring all backend schemas
+- **`src/api/`** — Axios client with JWT injection + 401 redirect; typed API functions
+- **`src/components/Shell.tsx`** — sidebar nav (`SRC / CLM / RVW / HYP`), `Page` wrapper
+- **`src/components/ui.tsx`** — `Badge`, `EpistemicBadge`, `ClaimTypeBadge`, `IngestionDot`, `ProvenanceBadge`, `Button`, `Input`, `Select`, `Card`, `Stat`, `Pagination`, `Spinner`, `EmptyState`, `ErrorState`
+- **`src/components/AddSourceModal.tsx`** — full source creation form
+- **`src/pages/Login.tsx`** — JWT auth form
+- **`src/pages/SourceList.tsx`** — table with type/discipline/provenance/full-text filters, pagination
+- **`src/pages/SourceDetail.tsx`** — metadata panel, claims list, ingest trigger button, ingestion status
+- **`src/pages/ClaimList.tsx`** — filter bar: epistemic status, claim type, origin, unreviewed toggle
+- **`src/pages/ReviewQueue.tsx`** — functional accept/reject cards with epistemic override (expanded in Chat 6)
+- **`src/pages/HypothesisList.tsx`** — framework cards, supporting/anomalous counts, red warning on empty anomalous_claims
+
+---
+
+## Running
+
+```bash
+# First run
+cp .env.example .env      # set DB_PASSWORD, SECRET_KEY, ANTHROPIC_API_KEY
+
+docker compose up db -d
+docker compose run --rm backend alembic upgrade head
+
+# Backend only
+docker compose up backend
+
+# Backend + frontend
+docker compose --profile frontend up
+
+# Import Excel data
+docker compose run --rm backend python import_excel.py
+```
+
+**Endpoints:**
+- Frontend: http://localhost:3000
+- API docs: http://localhost:8000/api/docs
+
+**First user:** `POST /api/v1/auth/register` with `{ email, username, password }`
 
 ---
 
 ## Key Design Principles
 
-1. **Claims layer is non-negotiable.** Never collapse source → synthesis. The claim is where epistemic status lives and where traceability is maintained.
+1. **Claims layer is non-negotiable.** Never collapse source → synthesis. The claim is where epistemic status lives.
 
-2. **Anomalies are signals.** The system surfaces unexplained residue rather than suppressing it. The `anomalous_given` relationship type and required `anomalous_claims` field are the structural mechanisms for this.
+2. **Anomalies are signals.** The `anomalous_given` relationship type and required `anomalous_claims` on Hypothesis are the structural mechanisms for this. The UI surfaces the warning prominently.
 
-3. **Confirmation bias is a structural risk.** Counter it at the schema level, not just in practice. `anomalous_claims` on Hypothesis is required, not optional.
+3. **Confirmation bias is a structural risk.** Counter it at the schema level. `anomalous_claims` is required, not optional — enforced by both API warning header and frontend UI.
 
-4. **Epistemic transparency throughout.** Every claim carries provenance, epistemic status, and reviewer attribution. Mixed-quality sources should never silently intermingle.
+4. **Epistemic transparency throughout.** Every claim carries provenance, epistemic status, and reviewer attribution.
 
-5. **Ontological agnosticism at the infrastructure level.** The system doesn't privilege materialist explanations. It makes ontological assumptions *visible* (via `assumed_ontology` field) rather than encoding them into the schema.
+5. **Ontological agnosticism at the infrastructure level.** The `assumed_ontologies` field makes paradigm assumptions explicit rather than encoding them into the schema.
 
 6. **Disciplinary lens separation.** Claims and sources are tagged by disciplinary frame so the neuroscience literature can be queried independently of the anomalist literature.
-
----
-
-## Open Decisions / Future Work
-
-- Multi-user auth: JWT scaffolded in Phase 1, full multi-tenancy deferred
-- Collaborative features: post-MVP
-- Direct academic database integration (PubMed, JSTOR): post-MVP
-- Automated account ingestion from online sources: raises methodological questions, deferred
-- Upgrade file storage to S3: when scale requires it
