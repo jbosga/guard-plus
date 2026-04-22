@@ -200,7 +200,7 @@ Accepted claims → DB with reviewer + timestamp
 | **Chat 1** | Project scaffolding, Docker Compose, PostgreSQL schema, SQLAlchemy models, Alembic migrations | **Done** |
 | **Chat 2** | FastAPI CRUD endpoints (Sources + Claims first), Pydantic schemas, JWT auth | **Done** |
 | **Chat 3** | Excel import script (pandas migration), schema validation against real data | **Done** |
-| **Chat 4** | PDF ingestion pipeline backend (pymupdf, OCR, Claude API claim extraction) | — |
+| **Chat 4** | PDF ingestion pipeline backend (pymupdf, OCR, Claude API claim extraction) | **Done** |
 | **Chat 5** | React frontend core (source list, source detail, claims list with filtering) | — |
 | **Chat 6** | Ingestion review queue UI (frontend for Chat 4 backend) | — |
 | **Chat 7** | Knowledge graph view (Cytoscape.js) | — |
@@ -226,6 +226,13 @@ Accepted claims → DB with reviewer + timestamp
 **Chat 3 — Excel Import**
 - `backend/import_excel.py`: pandas-based idempotent import script; reads `data_sheet.xlsx` (four sheets) and populates `sources`, `claims`, and `phenomenon_tags`; supports `--dry-run` and `--file` flags; skips rows whose `study_id` already exists
 - Bugfixes across models (`corpus.py`, `synthesis.py`, `user.py`), all CRUD routes, `security.py`, and `0001_initial_schema.py` to get the full stack running end-to-end
+
+**Chat 4 — PDF Ingestion Pipeline**
+- `app/services/ingestion.py`: full ingestion service — pymupdf text extraction with per-page Tesseract OCR fallback (threshold: <100 chars), Claude API claim extraction (`claude-sonnet-4-20250514`), atomic bulk claim insertion, `ingestion_status` lifecycle management; errors written to `source.ingestion_error`, never silently swallowed; text capped at 120k chars (~30k tokens) as cost guardrail; max 100 claims per source as over-segmentation guard
+- `app/api/routes/ingest.py`: `POST /api/v1/sources/{source_id}/ingest` — two paths: **AI path** (returns 202, runs pipeline in BackgroundTask, poll source for status); **manual path** (if `claims[]` provided: inserts immediately and returns 201; if no claims: returns 200 with source metadata for frontend form in Chat 6); text extraction runs for both paths
+- `alembic/versions/0003_add_ingestion_fields.py`: adds `ingestion_status`, `ingestion_method`, `ingestion_error`, `ai_extracted` flag on claims, and new `IngestionStatus`/`IngestionMethod` enums
+- `app/models/enums.py`, `app/models/corpus.py`: extended with ingestion enums and fields
+- Bugfixes to `app/services/ingestion.py` and `app/api/routes/sources.py` (Chat 4 follow-up)
 
 ---
 
