@@ -1,5 +1,6 @@
 import json
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -23,14 +24,14 @@ ANOMALOUS_EMPTY_WARNING = (
 )
 
 
-def _get_or_404(hypothesis_id: int, db: Session) -> Hypothesis:
+def _get_or_404(hypothesis_id: UUID, db: Session) -> Hypothesis:
     h = db.query(Hypothesis).filter(Hypothesis.id == hypothesis_id).first()
     if not h:
         raise HTTPException(status_code=404, detail="Hypothesis not found")
     return h
 
 
-def _resolve_claims(claim_ids: list[int], db: Session) -> list[Claim]:
+def _resolve_claims(claim_ids: list[UUID], db: Session) -> list[Claim]:
     if not claim_ids:
         return []
     claims = db.query(Claim).filter(Claim.id.in_(claim_ids)).all()
@@ -41,7 +42,7 @@ def _resolve_claims(claim_ids: list[int], db: Session) -> list[Claim]:
     return claims
 
 
-def _resolve_hypotheses(ids: list[int], db: Session) -> list[Hypothesis]:
+def _resolve_hypotheses(ids: list[UUID], db: Session) -> list[Hypothesis]:
     if not ids:
         return []
     items = db.query(Hypothesis).filter(Hypothesis.id.in_(ids)).all()
@@ -77,7 +78,7 @@ def _to_read(h: Hypothesis) -> HypothesisRead:
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=Page[HypothesisList])
+@router.get("", response_model=Page[HypothesisList])
 def list_hypotheses(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
@@ -105,7 +106,7 @@ def list_hypotheses(
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=HypothesisRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=HypothesisRead, status_code=status.HTTP_201_CREATED)
 def create_hypothesis(
     hyp_in: HypothesisCreate,
     response: Response,
@@ -143,7 +144,7 @@ def create_hypothesis(
 
 @router.get("/{hypothesis_id}", response_model=HypothesisRead)
 def get_hypothesis(
-    hypothesis_id: int,
+    hypothesis_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -154,7 +155,7 @@ def get_hypothesis(
 
 @router.patch("/{hypothesis_id}", response_model=HypothesisRead)
 def update_hypothesis(
-    hypothesis_id: int,
+    hypothesis_id: UUID,
     hyp_in: HypothesisUpdate,
     response: Response,
     db: Session = Depends(get_db),
@@ -200,7 +201,7 @@ def update_hypothesis(
 
 @router.delete("/{hypothesis_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_hypothesis(
-    hypothesis_id: int,
+    hypothesis_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

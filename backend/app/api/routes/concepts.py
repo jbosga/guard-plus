@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -18,7 +19,7 @@ from app.core.security import get_current_user
 router = APIRouter(prefix="/concepts", tags=["concepts"])
 
 
-def _get_concept_or_404(concept_id: int, db: Session) -> Concept:
+def _get_concept_or_404(concept_id: UUID, db: Session) -> Concept:
     c = db.query(Concept).filter(Concept.id == concept_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Concept not found")
@@ -38,7 +39,7 @@ def _resolve_claims(claim_ids: list[int], db: Session) -> list[Claim]:
 
 # ── Concepts ──────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=Page[ConceptRead])
+@router.get("", response_model=Page[ConceptRead])
 def list_concepts(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -61,7 +62,7 @@ def list_concepts(
     )
 
 
-@router.post("/", response_model=ConceptRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ConceptRead, status_code=status.HTTP_201_CREATED)
 def create_concept(
     concept_in: ConceptCreate,
     db: Session = Depends(get_db),
@@ -83,7 +84,7 @@ def create_concept(
 
 @router.get("/{concept_id}", response_model=ConceptRead)
 def get_concept(
-    concept_id: int,
+    concept_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -92,7 +93,7 @@ def get_concept(
 
 @router.patch("/{concept_id}", response_model=ConceptRead)
 def update_concept(
-    concept_id: int,
+    concept_id: UUID,
     concept_in: ConceptUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -113,7 +114,7 @@ def update_concept(
 
 @router.delete("/{concept_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_concept(
-    concept_id: int,
+    concept_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -128,7 +129,7 @@ def list_relationships(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     relationship_type: Optional[RelationshipType] = None,
-    concept_id: Optional[int] = Query(None, description="Filter to relationships involving this concept"),
+    concept_id: Optional[UUID] = Query(None, description="Filter to relationships involving this concept"),
     anomalous_only: bool = Query(False, description="Return only anomalous_given edges"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -185,7 +186,7 @@ def create_relationship(
 
 @router.patch("/relationships/{rel_id}", response_model=ConceptRelationshipRead)
 def update_relationship(
-    rel_id: int,
+    rel_id: UUID,
     rel_in: ConceptRelationshipUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -208,7 +209,7 @@ def update_relationship(
 
 @router.delete("/relationships/{rel_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_relationship(
-    rel_id: int,
+    rel_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

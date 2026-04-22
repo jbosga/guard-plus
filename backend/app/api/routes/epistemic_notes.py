@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -13,10 +14,10 @@ from app.core.security import get_current_user
 router = APIRouter(prefix="/epistemic-notes", tags=["epistemic-notes"])
 
 
-@router.get("/", response_model=list[EpistemicNoteRead])
+@router.get("", response_model=list[EpistemicNoteRead])
 def list_notes(
     attached_to_type: Optional[AttachableEntityType] = None,
-    attached_to_id: Optional[int] = None,
+    attached_to_id: Optional[UUID] = None,
     note_type: Optional[EpistemicNoteType] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -36,7 +37,7 @@ def list_notes(
     return [EpistemicNoteRead.model_validate(n) for n in q.order_by(EpistemicNote.created_at).all()]
 
 
-@router.post("/", response_model=EpistemicNoteRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EpistemicNoteRead, status_code=status.HTTP_201_CREATED)
 def create_note(
     note_in: EpistemicNoteCreate,
     db: Session = Depends(get_db),
@@ -57,7 +58,7 @@ def create_note(
 
 @router.patch("/{note_id}", response_model=EpistemicNoteRead)
 def update_note(
-    note_id: int,
+    note_id: UUID,
     text: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -73,7 +74,7 @@ def update_note(
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_note(
-    note_id: int,
+    note_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

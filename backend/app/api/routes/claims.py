@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.orm import Session
@@ -15,7 +16,7 @@ from app.core.security import get_current_user
 router = APIRouter(prefix="/claims", tags=["claims"])
 
 
-def _get_or_404(claim_id: int, db: Session) -> Claim:
+def _get_or_404(claim_id: UUID, db: Session) -> Claim:
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
@@ -35,7 +36,7 @@ def _resolve_tags(tag_ids: list[int], db: Session) -> list[PhenomenonTag]:
 
 # ── List / filter ─────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=Page[ClaimRead])
+@router.get("", response_model=Page[ClaimRead])
 def list_claims(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -118,7 +119,7 @@ def review_queue(
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=ClaimRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ClaimRead, status_code=status.HTTP_201_CREATED)
 def create_claim(
     claim_in: ClaimCreate,
     db: Session = Depends(get_db),
@@ -156,7 +157,7 @@ def create_claim(
 
 @router.get("/{claim_id}", response_model=ClaimRead)
 def get_claim(
-    claim_id: int,
+    claim_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -167,7 +168,7 @@ def get_claim(
 
 @router.patch("/{claim_id}", response_model=ClaimRead)
 def update_claim(
-    claim_id: int,
+    claim_id: UUID,
     claim_in: ClaimUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -191,7 +192,7 @@ def update_claim(
 
 @router.post("/{claim_id}/review", response_model=ClaimRead)
 def review_claim(
-    claim_id: int,
+    claim_id: UUID,
     review: ClaimReview,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -215,6 +216,9 @@ def review_claim(
     if review.epistemic_status:
         claim.epistemic_status = review.epistemic_status
 
+    if review.claim_type:
+        claim.claim_type = review.claim_type
+
     if review.tag_ids is not None:
         claim.tags = _resolve_tags(review.tag_ids, db)
 
@@ -230,7 +234,7 @@ def review_claim(
 
 @router.delete("/{claim_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_claim(
-    claim_id: int,
+    claim_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

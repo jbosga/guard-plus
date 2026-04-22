@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,7 @@ from app.core.security import get_current_user
 router = APIRouter(prefix="/tags", tags=["tags"])
 
 
-@router.get("/", response_model=list[PhenomenonTagRead])
+@router.get("", response_model=list[PhenomenonTagRead])
 def list_tags(
     category: Optional[TagCategory] = None,
     db: Session = Depends(get_db),
@@ -39,7 +40,7 @@ def tag_tree(
     return [PhenomenonTagTree.model_validate(r) for r in roots]
 
 
-@router.post("/", response_model=PhenomenonTagRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PhenomenonTagRead, status_code=status.HTTP_201_CREATED)
 def create_tag(
     tag_in: PhenomenonTagCreate,
     db: Session = Depends(get_db),
@@ -57,7 +58,7 @@ def create_tag(
 
 @router.patch("/{tag_id}", response_model=PhenomenonTagRead)
 def update_tag(
-    tag_id: int,
+    tag_id: UUID,
     tag_in: PhenomenonTagUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -74,7 +75,7 @@ def update_tag(
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_tag(
-    tag_id: int,
+    tag_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

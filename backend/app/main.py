@@ -8,6 +8,7 @@ from app.api.routes import ingest  # Phase 4
 settings = get_settings()
 
 app = FastAPI(
+    redirect_slashes=False,
     title="Abduction Research KMS",
     description=(
         "Knowledge management system for the scientific study of the alien abduction experience. "

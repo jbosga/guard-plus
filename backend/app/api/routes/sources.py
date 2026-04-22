@@ -29,14 +29,14 @@ ALLOWED_UPLOAD_TYPES = {
 }
 
 
-def _get_or_404(source_id: int, db: Session) -> Source:
+def _get_or_404(source_id: uuid.UUID, db: Session) -> Source:
     source = db.query(Source).filter(Source.id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
     return source
 
 
-def _claim_count(source_id: int, db: Session) -> int:
+def _claim_count(source_id: uuid.UUID, db: Session) -> int:
     return db.query(func.count(Claim.id)).filter(Claim.source_id == source_id).scalar() or 0
 
 
@@ -54,7 +54,7 @@ def _to_source_read(source: Source, db: Session) -> SourceRead:
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=Page[SourceList])
+@router.get("", response_model=Page[SourceList])
 def list_sources(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
@@ -98,7 +98,7 @@ def list_sources(
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=SourceRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=SourceRead, status_code=status.HTTP_201_CREATED)
 def create_source(
     source_in: SourceCreate,
     db: Session = Depends(get_db),
