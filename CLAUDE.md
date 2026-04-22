@@ -167,7 +167,7 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 | **Chat 3** | Excel import script (`import_excel.py`) | ✅ Done |
 | **Chat 4** | PDF ingestion pipeline (pymupdf, OCR, Claude API claim extraction) | ✅ Done |
 | **Chat 5** | React frontend core (source list, source detail, claims list, review queue skeleton, hypotheses list) | ✅ Done |
-| **Chat 6** | Ingestion review queue UI (full reviewer UX) | — |
+| **Chat 6** | Ingestion review queue UI (full reviewer UX) | ✅ Done |
 | **Chat 7** | Knowledge graph view (Cytoscape.js) | — |
 | **Chat 8** | Hypothesis workspace (synthesis layer) | — |
 
@@ -209,6 +209,11 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 - **`src/pages/ClaimList.tsx`** — filter bar: epistemic status, claim type, origin, unreviewed toggle
 - **`src/pages/ReviewQueue.tsx`** — functional accept/reject cards with epistemic override (expanded in Chat 6)
 - **`src/pages/HypothesisList.tsx`** — framework cards, supporting/anomalous counts, red warning on empty anomalous_claims
+
+### Chat 6 — Minor improvements
+- Review queue was deemed sufficient in current state
+- Added source title to claims
+- Added dynamic ingestion status
 
 ---
 
