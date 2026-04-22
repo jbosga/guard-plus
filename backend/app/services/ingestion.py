@@ -58,7 +58,7 @@ _OCR_DPI = 300
 _MAX_TEXT_CHARS = 120_000
 
 # Claude model used for extraction
-_EXTRACTION_MODEL = "claude-sonnet-4-20250514"
+_EXTRACTION_MODEL = "claude-sonnet-4-6"
 
 # Max claims we'll accept per source from the AI pass — a safety valve;
 # a paper with >100 extracted claims is almost certainly over-segmented.
@@ -180,7 +180,7 @@ def extract_text(source: Source, storage_path: str) -> ExtractionResult:
 
 # ── Claude extraction prompt ──────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """\
+_SYSTEM_PROMPT = _SYSTEM_PROMPT = """\
 You are a rigorous research assistant supporting a scientific study of the \
 anomalous abduction experience (AAE). Your task is to extract discrete, \
 atomic claims from the provided source text.
@@ -190,6 +190,18 @@ The research program is neither credulous nor dismissive. First-person \
 accounts are treated as empirical data. Your job is to extract what the \
 source actually says — not to validate or debunk it. You must preserve the \
 epistemic status of each claim as the source presents it.
+
+SCOPE: NOVEL CLAIMS ONLY
+Extract only claims that the authors of this source make in their own voice. \
+Do not extract claims attributed to other works (e.g. "Smith (1994) found \
+that...", "According to Jones...", "Previous research has shown..."). \
+Literature review sections and reference lists are out of scope.
+
+Exception: if a cited finding is load-bearing in the authors' own argument, \
+you may extract the authors' endorsement of it as a single claim, typed as \
+INFERRED and noting the dependency. Example: "The authors adopt Spanos's \
+(1996) sociocultural model as their explanatory framework" is extractable; \
+the contents of Spanos's model are not.
 
 CLAIM EXTRACTION RULES
 1. Each claim must be a single, atomic, self-contained proposition. Do not \
@@ -212,33 +224,80 @@ CLAIM EXTRACTION RULES
    a precise claim about missing time is more valuable than a vague claim \
    about "unusual experiences."
 
+EPISTEMIC STATUS: DECISION RULES
+Apply exactly one of these values to each claim. Read carefully — the \
+surface grammar of a sentence does not determine its epistemic status; \
+the source of the claim does.
+
+  observed
+    The claim is directly grounded in data the authors of THIS study \
+collected themselves: counts, measurements, test scores, coded interview \
+responses, survey answers. A claim can be OBSERVED even when stated without \
+hedging language.
+    ✓ "Fourteen of 19 participants reported a sensation of paralysis."
+    ✓ "Only six of the 20 subjects in the sexually abused group chose to \
+fill out the data sheets, and those six indicated they were women between \
+the ages of 21 and 33."
+    ✗ "Sleep paralysis affects an estimated 8% of the general population." \
+(background fact, not measured in this study → use asserted)
+
+  asserted
+    The claim is stated as fact but is NOT derived from this study's own \
+data. Includes background facts, epidemiological figures, theoretical \
+claims, and definitional statements drawn from general knowledge or prior \
+literature.
+    ✓ "Sleep paralysis affects an estimated 8% of the general population."
+    ✓ "The abduction narrative typically includes four phases."
+    ✗ "Mean fantasy-proneness score was 2.3 (SD 0.8)." (from study data → \
+use observed)
+
+  inferred
+    The authors' conclusion drawn from their own data or analysis. The claim \
+goes beyond directly reporting the data — it interprets or generalises.
+    ✓ "The elevated fantasy-proneness scores suggest a relationship between \
+imaginative absorption and AAE reporting."
+    ✓ "These findings are consistent with a sleep-state misattribution account."
+
+  speculative
+    The author explicitly hedges: "may", "might", "could suggest", \
+"perhaps", "it is possible that". The claim is conjecture, not conclusion.
+    ✓ "Missing time may reflect dissociative episodes triggered by trauma."
+
+  contested
+    The author explicitly acknowledges significant disagreement about this \
+claim in the literature, or presents it as one position among competing ones.
+    ✓ "Whether AAE reports reflect literal events or psychogenic elaboration \
+remains contested."
+
 CLAIM TYPES (use exactly these values)
   phenomenological, causal, correlational, definitional, methodological
-
-EPISTEMIC STATUS VALUES (use exactly these values)
-  asserted   — author states as fact without hedging
-  observed   — empirically recorded in study data
-  inferred   — author's conclusion from evidence
-  speculative — author's conjecture, explicitly hedged
-  contested   — author acknowledges significant disagreement
 
 OUTPUT FORMAT
 Return ONLY a valid JSON array. No preamble, no explanation, no markdown \
 fences. Each element must be an object with these fields:
-  claim_text      (string, required)
-  claim_type      (string, required, one of the values above)
+  claim_text       (string, required)
+  claim_type       (string, required, one of the values above)
   epistemic_status (string, required, one of the values above)
-  page_ref        (string or null — e.g. "42" or "12-13" or null)
-  verbatim        (boolean — true only if claim_text is a direct quote)
+  page_ref         (string or null — e.g. "42" or "12-13" or null)
+  verbatim         (boolean — true only if claim_text is a direct quote)
 
 Example of valid output:
 [
   {
-    "claim_text": "Subjects consistently reported a period of unaccounted time \
-following the experience, ranging from 30 minutes to several hours.",
+    "claim_text": "Fourteen of 19 participants reported a sensation of \
+paralysis at the onset of the experience.",
     "claim_type": "phenomenological",
     "epistemic_status": "observed",
     "page_ref": "47",
+    "verbatim": false
+  },
+  {
+    "claim_text": "The authors adopt Spanos's sociocultural model as their \
+primary explanatory framework, treating AAE reports as culturally scripted \
+narratives rather than veridical memories.",
+    "claim_type": "causal",
+    "epistemic_status": "inferred",
+    "page_ref": "32",
     "verbatim": false
   }
 ]

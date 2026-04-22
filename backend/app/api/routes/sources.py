@@ -1,5 +1,6 @@
 import os
 import shutil
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status, Response
@@ -131,7 +132,7 @@ def create_source(
 
 @router.get("/{source_id}", response_model=SourceRead)
 def get_source(
-    source_id: int,
+    source_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -142,7 +143,7 @@ def get_source(
 
 @router.patch("/{source_id}", response_model=SourceRead)
 def update_source(
-    source_id: int,
+    source_id: uuid.UUID,
     source_in: SourceUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -159,7 +160,7 @@ def update_source(
 
 @router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_source(
-    source_id: int,
+    source_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -177,7 +178,7 @@ def delete_source(
 
 @router.post("/{source_id}/upload", response_model=dict)
 def upload_file(
-    source_id: int,
+    source_id:  uuid.UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -208,7 +209,7 @@ def upload_file(
 
 @router.get("/{source_id}/claims", response_model=list[ClaimRead])
 def get_source_claims(
-    source_id: int,
+    source_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
