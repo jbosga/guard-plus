@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { path: '/sources',    label: 'Sources',       icon: '📄' },
   { path: '/claims',     label: 'Claims',        icon: '🔖' },
   { path: '/review',     label: 'Review Queue',  icon: '✅' },
+  { path: '/graph',      label: 'Graph',         icon: '◈'  },
   { path: '/hypotheses', label: 'Hypotheses',    icon: '🔬' },
 ];
 

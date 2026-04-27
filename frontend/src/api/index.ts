@@ -5,7 +5,8 @@ import type {
   ClaimRead,
   HypothesisList,
   DisciplinaryFrame, ProvenanceQuality, SourceType,
-  EpistemicStatus, ClaimType,
+  EpistemicStatus, ClaimType,  ConceptRead, ConceptRelationshipRead 
+
 } from '../types';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -130,5 +131,50 @@ export async function updateClaim(claimId: string, payload: {
 
 export async function getHypotheses(params: { page?: number; page_size?: number } = {}): Promise<Page<HypothesisList>> {
   const { data } = await client.get<Page<HypothesisList>>('/hypotheses', { params });
+  return data;
+}
+
+
+export async function getConcepts(params: {
+  page?: number;
+  page_size?: number;
+  concept_type?: string;
+  search?: string;
+} = {}): Promise<Page<ConceptRead>> {
+  const { data } = await client.get<Page<ConceptRead>>('/concepts', { params });
+  return data;
+}
+
+export async function getRelationships(params: {
+  page?: number;
+  page_size?: number;
+  relationship_type?: string;
+  concept_id?: string;
+  anomalous_only?: boolean;
+} = {}): Promise<Page<ConceptRelationshipRead>> {
+  const { data } = await client.get<Page<ConceptRelationshipRead>>('/concepts/relationships/', { params });
+  return data;
+}
+
+export async function createConcept(payload: {
+  label: string;
+  concept_type: string;
+  description?: string;
+  epistemic_status?: string;
+  supporting_claim_ids?: string[];
+}): Promise<ConceptRead> {
+  const { data } = await client.post<ConceptRead>('/concepts', payload);
+  return data;
+}
+
+export async function createRelationship(payload: {
+  source_concept_id: string;
+  target_concept_id: string;
+  relationship_type: string;
+  strength?: string;
+  notes?: string;
+  supporting_claim_ids?: string[];
+}): Promise<ConceptRelationshipRead> {
+  const { data } = await client.post<ConceptRelationshipRead>('/concepts/relationships/', payload);
   return data;
 }

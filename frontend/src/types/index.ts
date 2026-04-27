@@ -166,3 +166,29 @@ export interface HypothesisList {
   created_at: string;
   updated_at: string;
 }
+
+
+export interface ConceptRead {
+  id: string;
+  label: string;
+  concept_type: ConceptType;
+  description: string | null;
+  epistemic_status: EpistemicStatus | null;
+  supporting_claim_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConceptRelationshipRead {
+  id: string;
+  source_concept_id: string;
+  target_concept_id: string;
+  relationship_type: RelationshipType;
+  strength: RelationshipStrength;
+  notes: string | null;
+  supporting_claim_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type RelationshipStrength = 'weak' | 'moderate' | 'strong';
