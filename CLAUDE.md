@@ -168,7 +168,7 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 | **Chat 4** | PDF ingestion pipeline (pymupdf, OCR, Claude API claim extraction) | ✅ Done |
 | **Chat 5** | React frontend core (source list, source detail, claims list, review queue skeleton, hypotheses list) | ✅ Done |
 | **Chat 6** | Ingestion review queue UI (full reviewer UX) | ✅ Done |
-| **Chat 7** | Knowledge graph view (Cytoscape.js) | — |
+| **Chat 7** | Knowledge graph view (Cytoscape.js) | ✅ Done |
 | **Chat 8** | Hypothesis workspace (synthesis layer) | — |
 
 ---
@@ -214,6 +214,24 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 - Review queue was deemed sufficient in current state
 - Added source title to claims
 - Added dynamic ingestion status
+
+### Chat 7 — Knowledge Graph View
+- **`src/pages/GraphView.tsx`** — full Cytoscape.js graph view at `/graph`
+- Node colour by concept type (phenomenon, mechanism, entity, location, process, theoretical_construct); node size scales with `supporting_claim_ids` count (clamped 20–48px)
+- Edge colour and dashed style by relationship type; `anomalous_given` edges rendered in intentionally loud red with dashed stroke
+- Edge width by strength (weak / moderate / strong)
+- Filter bar: concept type dropdown, relationship type dropdown, "⚠ anomalous only" toggle (mutually exclusive with rel-type filter); Clear button
+- Click-on-node → neighbourhood highlight (all other elements dimmed to 8–25% opacity) + `DetailPanel` slide-in (300px): concept type, label, description, epistemic status badge, supporting claim count, all connected edges with direction arrow and neighbour label
+- Click on canvas background → deselect and remove dimming
+- Toolbar: Fit (fit all) and Center (zoom to selected node or fit all)
+- Collapsible Legend (bottom-left): node type colour swatches + edge type colour swatches
+- Zoom hint (bottom-right): scroll / drag / click affordances
+- Cose layout with physics tuning (nodeRepulsion 400k, gravity 80, 1000 iterations); re-runs on filter change without destroying the instance
+- Fetches up to 200 concepts and 500 relationships via `getConcepts` / `getRelationships`
+- **`src/App.tsx`** — added `/graph` route → `<GraphView />`
+- **`src/components/Shell.tsx`** — added `GRF` nav entry
+- **`src/api/index.ts`** — added `getRelationships()` typed API call
+- **`src/types/index.ts`** — added `ConceptRelationshipRead`, `RelationshipType` types
 
 ---
 
