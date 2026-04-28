@@ -253,15 +253,15 @@ export function Select({ label, options, placeholder, style, ...props }: SelectP
 // ── Card ──────────────────────────────────────────────────────────────────────
 
 export function Card({
-  children, style, className,
-}: { children: React.ReactNode; style?: React.CSSProperties; className?: string }) {
+  children, style, className, onClick,
+}: { children: React.ReactNode; style?: React.CSSProperties; className?: string; onClick?: () => void }) {
   return (
     <div className={className} style={{
       background: 'var(--bg-0)',
       border: '1px solid var(--border-dim)',
       borderRadius: 'var(--radius-md)',
       ...style,
-    }}>
+    }} onClick={onClick}>
       {children}
     </div>
   );

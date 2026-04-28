@@ -7,6 +7,8 @@ import { ClaimList } from './pages/ClaimList';
 import { ReviewQueue } from './pages/ReviewQueue';
 import { GraphView } from './pages/GraphView';
 import { HypothesisList } from './pages/HypothesisList';
+import { HypothesisDetail } from './components/HypothesisDetail';
+
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -31,6 +33,7 @@ export default function App() {
           <Route path="/review" element={<RequireAuth><ReviewQueue /></RequireAuth>} />
           <Route path="/graph" element={<RequireAuth><GraphView /></RequireAuth>} />
           <Route path="/hypotheses" element={<RequireAuth><HypothesisList /></RequireAuth>} />
+          <Route path="/hypotheses/:id" element={<RequireAuth><HypothesisDetail /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/sources" replace />} />
         </Routes>
       </BrowserRouter>

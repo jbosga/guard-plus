@@ -220,13 +220,13 @@ class HypothesisCreate(BaseModel):
     description: Optional[str] = None
     framework: HypothesisFramework
     assumed_ontologies: Optional[List[AssumedOntology]] = None
-    required_assumptions: Optional[List[str]] = None
+    required_assumptions: Optional[List[uuid.UUID]] = None
     status: HypothesisStatus = HypothesisStatus.ACTIVE
     notes: Optional[str] = None
-    scope_claim_ids: List[int] = []
-    supporting_claim_ids: List[int] = []
-    anomalous_claim_ids: List[int] = []          # structurally required; enforced below
-    competing_hypothesis_ids: List[int] = []
+    scope_claim_ids: List[uuid.UUID] = []
+    supporting_claim_ids: List[uuid.UUID] = []
+    anomalous_claim_ids: List[uuid.UUID] = []          # structurally required; enforced below
+    competing_hypothesis_ids: List[uuid.UUID] = []
 
     @model_validator(mode="after")
     def anomalous_claims_warning(self) -> "HypothesisCreate":
@@ -245,15 +245,15 @@ class HypothesisUpdate(BaseModel):
     required_assumptions: Optional[List[str]] = None
     status: Optional[HypothesisStatus] = None
     notes: Optional[str] = None
-    scope_claim_ids: Optional[List[int]] = None
-    supporting_claim_ids: Optional[List[int]] = None
-    anomalous_claim_ids: Optional[List[int]] = None
-    competing_hypothesis_ids: Optional[List[int]] = None
+    scope_claim_ids: Optional[List[uuid.UUID]] = None
+    supporting_claim_ids: Optional[List[uuid.UUID]] = None
+    anomalous_claim_ids: Optional[List[uuid.UUID]] = None
+    competing_hypothesis_ids: Optional[List[uuid.UUID]] = None
 
 
 class HypothesisList(BaseModel):
     """Lightweight list view with counts instead of full claim lists."""
-    id: int
+    id: uuid.UUID
     label: str
     framework: HypothesisFramework
     status: HypothesisStatus
@@ -280,15 +280,15 @@ class HypothesisRead(HypothesisList):
 
 class EpistemicNoteCreate(BaseModel):
     attached_to_type: AttachableEntityType
-    attached_to_id: int
+    attached_to_id: uuid.UUID
     note_type: EpistemicNoteType
     text: str
 
 
 class EpistemicNoteRead(BaseModel):
-    id: int
+    id: uuid.UUID
     attached_to_type: AttachableEntityType
-    attached_to_id: int
+    attached_to_id: uuid.UUID
     note_type: EpistemicNoteType
     text: str
     author: Optional[str] = None

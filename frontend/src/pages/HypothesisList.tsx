@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getHypotheses } from '../api';
+import { AddHypothesisModal } from '../components/AddHypothesisModal';
 import {
   Page, Spinner, ErrorState, EmptyState, Pagination,
-  HypothesisStatusBadge, Badge, Card,
+  HypothesisStatusBadge, Badge, Card, Button
 } from '../components/ui';
 import { Shell } from '../components/Shell';
 
@@ -19,7 +21,9 @@ const FRAMEWORK_COLORS: Record<string, string> = {
 };
 
 export function HypothesisList() {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [showAdd, setShowAdd] = useState(false); 
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hypotheses', page],
@@ -31,6 +35,11 @@ export function HypothesisList() {
       <Page
         title="Hypotheses"
         subtitle="Explanatory frameworks under active investigation"
+        actions={
+        <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
+          + new hypothesis
+        </Button>
+        }
       >
         {isLoading && <Spinner />}
         {isError && <ErrorState message="Failed to load hypotheses" />}
@@ -45,9 +54,11 @@ export function HypothesisList() {
               key={hyp.id}
               className="fade-in"
               style={{
-                padding: 'var(--space-4)',
-                animationDelay: `${i * 25}ms`,
+                  padding: 'var(--space-4)',
+                  animationDelay: `${i * 25}ms`,
+                  cursor: 'pointer',
               }}
+              onClick={() => navigate(`/hypotheses/${hyp.id}`)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-4)' }}>
                 <div style={{ flex: 1 }}>
@@ -138,6 +149,9 @@ export function HypothesisList() {
           <Pagination page={data.page} pages={data.pages} total={data.total} onPage={setPage} />
         )}
       </Page>
+      {showAdd && (
+  <AddHypothesisModal onClose={() => setShowAdd(false)} />
+    )}
     </Shell>
   );
 }

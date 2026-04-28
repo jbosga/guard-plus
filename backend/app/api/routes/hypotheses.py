@@ -70,7 +70,7 @@ def _to_read(h: Hypothesis) -> HypothesisRead:
     d.scope_claims = [ClaimRead.model_validate(c) for c in h.scope_claims]
     d.supporting_claims = [ClaimRead.model_validate(c) for c in h.supporting_claims]
     d.anomalous_claims = [ClaimRead.model_validate(c) for c in h.anomalous_claims]
-    d.required_assumptions = [ClaimRead.model_validate(c) for c in h.required_assumptions]
+    d.required_assumptions = [ClaimRead.model_validate(c) for c in h.required_assumptions] if h.required_assumptions else []
     if h.assumed_ontologies:
         d.assumed_ontologies = json.loads(h.assumed_ontologies) if isinstance(h.assumed_ontologies, str) else h.assumed_ontologies
     return d
@@ -131,7 +131,6 @@ def create_hypothesis(
         scope_claims=_resolve_claims(hyp_in.scope_claim_ids, db),
         supporting_claims=_resolve_claims(hyp_in.supporting_claim_ids, db),
         anomalous_claims=_resolve_claims(hyp_in.anomalous_claim_ids, db),
-        required_assumptions_rel=_resolve_claims(hyp_in.required_assumption_ids, db),
         competing_hypotheses=_resolve_hypotheses(hyp_in.competing_hypothesis_ids, db),
     )
     db.add(hyp)

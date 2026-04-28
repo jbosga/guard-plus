@@ -167,6 +167,50 @@ export interface HypothesisList {
   updated_at: string;
 }
 
+export interface HypothesisRead {
+  id: string;
+  label: string;
+  description: string | null;
+  framework: HypothesisFramework;
+  status: HypothesisStatus;
+  assumed_ontologies: string[] | null;
+  required_assumptions: string[] | null;
+  notes: string | null;
+  supporting_claim_count: number;
+  anomalous_claim_count: number;
+  scope_claims: ClaimRead[];
+  supporting_claims: ClaimRead[];
+  anomalous_claims: ClaimRead[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HypothesisCreate {
+  label: string;
+  description?: string;
+  framework: HypothesisFramework;
+  status?: HypothesisStatus;
+  assumed_ontologies?: string[];
+  required_assumptions?: string[];
+  notes?: string;
+  scope_claim_ids?: string[];
+  supporting_claim_ids?: string[];
+  anomalous_claim_ids?: string[];
+  competing_hypothesis_ids?: string[];
+}
+
+export interface HypothesisUpdate {
+  label?: string;
+  description?: string;
+  framework?: HypothesisFramework;
+  status?: HypothesisStatus;
+  assumed_ontologies?: string[];
+  required_assumptions?: string[];
+  notes?: string;
+  scope_claim_ids?: string[];
+  supporting_claim_ids?: string[];
+  anomalous_claim_ids?: string[];
+}
 
 export interface ConceptRead {
   id: string;

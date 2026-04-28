@@ -5,7 +5,8 @@ import type {
   ClaimRead,
   HypothesisList,
   DisciplinaryFrame, ProvenanceQuality, SourceType,
-  EpistemicStatus, ClaimType,  ConceptRead, ConceptRelationshipRead 
+  EpistemicStatus, ClaimType,  ConceptRead, ConceptRelationshipRead, 
+  HypothesisRead, HypothesisCreate, HypothesisUpdate,
 
 } from '../types';
 
@@ -129,11 +130,35 @@ export async function updateClaim(claimId: string, payload: {
 
 // ── Hypotheses ────────────────────────────────────────────────────────────────
 
-export async function getHypotheses(params: { page?: number; page_size?: number } = {}): Promise<Page<HypothesisList>> {
+export async function getHypotheses(params: {
+  page?: number;
+  page_size?: number;
+  framework?: string;
+  status?: string;
+  search?: string;
+} = {}): Promise<Page<HypothesisList>> {
   const { data } = await client.get<Page<HypothesisList>>('/hypotheses', { params });
   return data;
 }
 
+export async function getHypothesis(id: string): Promise<HypothesisRead> {
+  const { data } = await client.get<HypothesisRead>(`/hypotheses/${id}`);
+  return data;
+}
+
+export async function createHypothesis(payload: HypothesisCreate): Promise<HypothesisRead> {
+  const { data } = await client.post<HypothesisRead>('/hypotheses', payload);
+  return data;
+}
+
+export async function updateHypothesis(id: string, payload: HypothesisUpdate): Promise<HypothesisRead> {
+  const { data } = await client.patch<HypothesisRead>(`/hypotheses/${id}`, payload);
+  return data;
+}
+
+export async function deleteHypothesis(id: string): Promise<void> {
+  await client.delete(`/hypotheses/${id}`);
+}
 
 export async function getConcepts(params: {
   page?: number;
