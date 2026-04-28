@@ -169,7 +169,7 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 | **Chat 5** | React frontend core (source list, source detail, claims list, review queue skeleton, hypotheses list) | ✅ Done |
 | **Chat 6** | Ingestion review queue UI (full reviewer UX) | ✅ Done |
 | **Chat 7** | Knowledge graph view (Cytoscape.js) | ✅ Done |
-| **Chat 8** | Hypothesis workspace (synthesis layer) | — |
+| **Chat 8** | Hypothesis workspace (synthesis layer) | ✅ Done |
 
 ---
 
@@ -232,6 +232,21 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 - **`src/components/Shell.tsx`** — added `GRF` nav entry
 - **`src/api/index.ts`** — added `getRelationships()` typed API call
 - **`src/types/index.ts`** — added `ConceptRelationshipRead`, `RelationshipType` types
+
+### Chat 8 — Hypothesis Workspace
+- **`src/components/HypothesisDetail.tsx`** — full hypothesis detail/edit page at `/hypotheses/:id`
+  - Inline editing of label, description, notes, framework, status, assumed ontologies
+  - Two claim slots: **Supporting** (evidence in favour), **Anomalous** (evidence it cannot explain)
+  - `ClaimAdder` component: debounced full-text search across the claim corpus (300 ms), filters out already-linked claims, shows epistemic status + claim type badges + source title inline
+  - `ClaimRow` component: anomalous claims rendered with red tint background and border to keep the anti-bias signal prominent; per-row remove button
+  - Optimistic save via `updateHypothesis`; delete with navigate-back
+  - `HypothesisStatusBadge` added to `ui.tsx`
+- **`src/components/AddHypothesisModal.tsx`** — creation modal launched from `HypothesisList`; sets label, framework, status, assumed ontologies (multi-select toggle chips), description, notes; navigates to detail on success
+- **`src/pages/HypothesisList.tsx`** — wired up `AddHypothesisModal` and row-click navigation to detail
+- **`backend/app/models/synthesis.py`** — fixed `HypothesisCreate`, `HypothesisUpdate`, `HypothesisList`, `HypothesisRead`, `EpistemicNoteCreate` to use `uuid.UUID` for all ID fields (was `int`)
+- **`src/api/index.ts`** — added `createHypothesis`, `updateHypothesis`, `deleteHypothesis`, `getHypothesis` typed API calls
+- **`src/types/index.ts`** — added `HypothesisRead`, `HypothesisCreate`, `HypothesisUpdate`, `HypothesisStatus`, `HypothesisFramework`, `AssumedOntology` types
+- **`src/App.tsx`** — added `/hypotheses/:id` route → `<HypothesisDetail />`
 
 ---
 
