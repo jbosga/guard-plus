@@ -117,15 +117,13 @@ function ClaimAdder({
 
   const handleChange = useCallback((v: string) => {
     setQuery(v);
-    // simple debounce via setTimeout
     const t = setTimeout(() => setDebouncedQuery(v), 300);
     return () => clearTimeout(t);
   }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ['claims-search', debouncedQuery],
-    queryFn: () => getClaims({ search: debouncedQuery, page_size: 20 }),
-    enabled: debouncedQuery.length >= 2,
+    queryFn: () => getClaims({ search: debouncedQuery || undefined, page_size: 50 }),
   });
 
   const results = (data?.items ?? []).filter(c => !currentIds.has(c.id));
@@ -138,51 +136,49 @@ function ClaimAdder({
         onChange={e => handleChange(e.target.value)}
         placeholder="Search claims to add…"
       />
-      {debouncedQuery.length >= 2 && (
-        <div style={{
-          marginTop: 6,
-          border: '1px solid var(--border-dim)',
-          borderRadius: 'var(--radius-md)',
-          background: 'var(--bg-0)',
-          maxHeight: 280,
-          overflowY: 'auto',
-        }}>
-          {isLoading && (
-            <div style={{ padding: 'var(--space-3)', fontSize: 12, color: 'var(--text-dim)' }}>
-              Searching…
+      <div style={{
+        marginTop: 6,
+        border: '1px solid var(--border-dim)',
+        borderRadius: 'var(--radius-md)',
+        background: 'var(--bg-0)',
+        maxHeight: 280,
+        overflowY: 'auto',
+      }}>
+        {isLoading && (
+          <div style={{ padding: 'var(--space-3)', fontSize: 12, color: 'var(--text-dim)' }}>
+            Loading…
+          </div>
+        )}
+        {!isLoading && results.length === 0 && (
+          <div style={{ padding: 'var(--space-3)', fontSize: 12, color: 'var(--text-dim)' }}>
+            No unlinked claims{debouncedQuery ? ' match.' : ' available.'}
+          </div>
+        )}
+        {results.map(c => (
+          <button
+            key={c.id}
+            onClick={() => { onAdd(c); setQuery(''); setDebouncedQuery(''); }}
+            style={{
+              display: 'block', width: '100%', textAlign: 'left',
+              background: 'none', border: 'none', borderBottom: '1px solid var(--border-dim)',
+              color: 'var(--text-primary)', cursor: 'pointer',
+              padding: 'var(--space-3)',
+              fontSize: 12, lineHeight: 1.5,
+            }}
+          >
+            <div style={{ marginBottom: 4 }}>{c.claim_text}</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <EpistemicBadge status={c.epistemic_status} />
+              <ClaimTypeBadge type={c.claim_type} />
+              {c.source_title && (
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                  {c.source_title}
+                </span>
+              )}
             </div>
-          )}
-          {!isLoading && results.length === 0 && (
-            <div style={{ padding: 'var(--space-3)', fontSize: 12, color: 'var(--text-dim)' }}>
-              No unlinked claims match.
-            </div>
-          )}
-          {results.map(c => (
-            <button
-              key={c.id}
-              onClick={() => { onAdd(c); setQuery(''); setDebouncedQuery(''); }}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                background: 'none', border: 'none', borderBottom: '1px solid var(--border-dim)',
-                color: 'var(--text-primary)', cursor: 'pointer',
-                padding: 'var(--space-3)',
-                fontSize: 12, lineHeight: 1.5,
-              }}
-            >
-              <div style={{ marginBottom: 4 }}>{c.claim_text}</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <EpistemicBadge status={c.epistemic_status} />
-                <ClaimTypeBadge type={c.claim_type} />
-                {c.source_title && (
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                    {c.source_title}
-                  </span>
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -539,23 +535,7 @@ export function HypothesisDetail() {
           )}
         </Card>
 
-        {/* ── Anomalous warning ── */}
-        {anomalousEmpty && !editing && (
-          <div style={{
-            marginBottom: 'var(--space-4)',
-            padding: 'var(--space-3) var(--space-4)',
-            background: 'rgba(255,43,43,0.08)',
-            border: '1px solid rgba(255,43,43,0.4)',
-            borderRadius: 'var(--radius-md)',
-            display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-          }}>
-            <span style={{ fontSize: 16 }}>⚠</span>
-            <span style={{ fontSize: 12, color: 'var(--status-error)', fontFamily: 'var(--font-mono)' }}>
-              No anomalous claims declared. Every hypothesis must identify evidence it cannot explain.
-              Confirmation bias is a structural risk.
-            </span>
-          </div>
-        )}
+    
 
         {/* ── Claim sections ── */}
 
@@ -581,7 +561,7 @@ export function HypothesisDetail() {
 
         <ClaimSection
           title="Anomalous claims"
-          subtitle="Evidence this hypothesis cannot explain — required"
+          subtitle="Evidence this hypothesis cannot explain"
           claims={anomalousClaims ?? []}
           slot="anomalous_claims"
           allLinkedIds={allLinkedIds}
