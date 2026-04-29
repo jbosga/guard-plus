@@ -1,7 +1,7 @@
 """
 SQLAlchemy ORM models and Pydantic schemas for the corpus layer.
 
-SQLAlchemy models: Source, Account, PhenomenonTag, Claim
+SQLAlchemy models: Source, Account, PhenomenonTag, Observation
 Pydantic schema naming convention:
   *Create  — request body for POST
   *Update  — request body for PATCH (all fields optional)
@@ -16,24 +16,25 @@ from typing import Optional, List
 from sqlalchemy import String, Text, Boolean, Integer, Enum, ForeignKey, Table, Column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from app.db.base import Base, TimestampMixin
 from app.models.enums import (
     SourceType, DisciplinaryFrame, ProvenanceQuality,
     AccountContext, CorroborationLevel,
-    EpistemicStatus, ClaimType,
+    ObservationEpistemicStatus, ContentType, SourceModality,
+    EpistemicDistance, CollectionMethod, SampleSizeTier, SamplingMethod,
     TagCategory,
-    IngestionStatus, IngestionMethod,  # Phase 4
+    IngestionStatus, IngestionMethod,
 )
 
 
 # ── Association tables ────────────────────────────────────────────────────────
 
-claim_tags = Table(
-    "claim_tags",
+observation_tags = Table(
+    "observation_tags",
     Base.metadata,
-    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+    Column("observation_id", UUID(as_uuid=True), ForeignKey("observations.id", ondelete="CASCADE"), primary_key=True),
     Column("tag_id", UUID(as_uuid=True), ForeignKey("phenomenon_tags.id", ondelete="CASCADE"), primary_key=True),
 )
 
@@ -79,7 +80,6 @@ class Source(Base, TimestampMixin):
     raw_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     file_ref: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Phase 4 additions
     ingestion_status: Mapped[Optional[IngestionStatus]] = mapped_column(
         Enum(IngestionStatus, name="ingestion_status_enum", create_type=False,
              values_callable=lambda x: [e.value for e in x]),
@@ -87,7 +87,7 @@ class Source(Base, TimestampMixin):
     )
     ingestion_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    claims: Mapped[List["Claim"]] = relationship("Claim", back_populates="source", cascade="all, delete-orphan")
+    observations: Mapped[List["Observation"]] = relationship("Observation", back_populates="source", cascade="all, delete-orphan")
     account_detail: Mapped[Optional["Account"]] = relationship(
         "Account", back_populates="source", uselist=False, cascade="all, delete-orphan"
     )
@@ -114,36 +114,66 @@ class Account(Base):
     source: Mapped["Source"] = relationship("Source", back_populates="account_detail")
 
 
-class Claim(Base, TimestampMixin):
-    __tablename__ = "claims"
+class Observation(Base, TimestampMixin):
+    __tablename__ = "observations"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    claim_text: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    content_type: Mapped[ContentType] = mapped_column(
+        Enum(ContentType, name="content_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    source_modality: Mapped[SourceModality] = mapped_column(
+        Enum(SourceModality, name="source_modality_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    epistemic_distance: Mapped[EpistemicDistance] = mapped_column(
+        Enum(EpistemicDistance, name="epistemic_distance_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    collection_method: Mapped[CollectionMethod] = mapped_column(
+        Enum(CollectionMethod, name="collection_method_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+
+    epistemic_status: Mapped[ObservationEpistemicStatus] = mapped_column(
+        Enum(ObservationEpistemicStatus, name="observation_epistemic_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="reported",
+    )
+    corroboration_level: Mapped[CorroborationLevel] = mapped_column(
+        Enum(CorroborationLevel, name="corroboration_level_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="none",
+    )
+
+    sample_n: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    sample_size_tier: Mapped[Optional[SampleSizeTier]] = mapped_column(
+        Enum(SampleSizeTier, name="sample_size_tier_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    sampling_method: Mapped[Optional[SamplingMethod]] = mapped_column(
+        Enum(SamplingMethod, name="sampling_method_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    inclusion_criteria_documented: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
     verbatim: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     page_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    timestamp_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    epistemic_status: Mapped[EpistemicStatus] = mapped_column(
-        Enum(EpistemicStatus, name="epistemic_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
-        nullable=False, server_default="asserted"
-    )
-    claim_type: Mapped[ClaimType] = mapped_column(
-        Enum(ClaimType, name="claim_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False
-    )
-    reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    reviewed_at: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    ai_extracted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    # Phase 4: richer provenance than the bool above
     ingestion_method: Mapped[Optional[IngestionMethod]] = mapped_column(
         Enum(IngestionMethod, name="ingestion_method_enum", create_type=False,
              values_callable=lambda x: [e.value for e in x]),
         nullable=True,
     )
 
-    source: Mapped["Source"] = relationship("Source", back_populates="claims")
-    tags: Mapped[List["PhenomenonTag"]] = relationship("PhenomenonTag", secondary=claim_tags)
+    reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    reviewed_at: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    ai_extracted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+
+    source: Mapped["Source"] = relationship("Source", back_populates="observations")
+    tags: Mapped[List["PhenomenonTag"]] = relationship("PhenomenonTag", secondary=observation_tags)
 
 
 # ── PhenomenonTag ─────────────────────────────────────────────────────────────
@@ -186,7 +216,7 @@ PhenomenonTagTree.model_rebuild()
 # ── Account detail ─────────────────────────────────────────────────────────────
 
 class AccountDetailCreate(BaseModel):
-    account_date: Optional[str] = None          # ISO date or year, nullable intentional
+    account_date: Optional[str] = None
     reporter_demographics: Optional[dict] = None
     reporting_lag_days: Optional[int] = None
     context: Optional[AccountContext] = None
@@ -217,7 +247,6 @@ class SourceCreate(BaseModel):
     disciplinary_frame: Optional[DisciplinaryFrame] = None
     provenance_quality: ProvenanceQuality = ProvenanceQuality.UNKNOWN
     notes: Optional[str] = None
-    # Only used when source_type == 'account'
     account_detail: Optional[AccountDetailCreate] = None
 
 
@@ -242,8 +271,8 @@ class SourceList(BaseModel):
     disciplinary_frame: Optional[DisciplinaryFrame] = None
     provenance_quality: ProvenanceQuality
     ingestion_date: Optional[str] = None
-    ingestion_status: Optional[IngestionStatus] = None  # Phase 4
-    claim_count: int = 0
+    ingestion_status: Optional[IngestionStatus] = None
+    observation_count: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -254,50 +283,81 @@ class SourceRead(SourceList):
     doi: Optional[str] = None
     file_ref: Optional[str] = None
     notes: Optional[str] = None
-    ingestion_error: Optional[str] = None  # Phase 4: surface pipeline errors
+    ingestion_error: Optional[str] = None
     account_detail: Optional[AccountDetailRead] = None
     created_at: datetime
     updated_at: datetime
 
 
-# ── Claim ─────────────────────────────────────────────────────────────────────
+# ── Observation ───────────────────────────────────────────────────────────────
 
-class ClaimCreate(BaseModel):
+class ObservationCreate(BaseModel):
     source_id: uuid.UUID
-    claim_text: str
+    content: str
+    content_type: ContentType
+    source_modality: SourceModality
+    epistemic_distance: EpistemicDistance
+    collection_method: CollectionMethod
+    epistemic_status: ObservationEpistemicStatus = ObservationEpistemicStatus.REPORTED
+    corroboration_level: CorroborationLevel = CorroborationLevel.NONE
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[SampleSizeTier] = None
+    sampling_method: Optional[SamplingMethod] = None
+    inclusion_criteria_documented: Optional[bool] = None
     verbatim: bool = False
     page_ref: Optional[str] = None
-    timestamp_ref: Optional[str] = None
-    epistemic_status: EpistemicStatus = EpistemicStatus.ASSERTED
-    claim_type: ClaimType
-    tag_ids: List[int] = []
+    tag_ids: List[uuid.UUID] = []
     ai_extracted: bool = False
 
+    @model_validator(mode="after")
+    def check_aggregate_fields(self) -> "ObservationCreate":
+        agg = [self.sample_n, self.sample_size_tier, self.sampling_method, self.inclusion_criteria_documented]
+        if any(f is not None for f in agg) and self.epistemic_distance != EpistemicDistance.AGGREGATED:
+            raise ValueError(
+                "Aggregate fields (sample_n, sample_size_tier, sampling_method, "
+                "inclusion_criteria_documented) may only be set when epistemic_distance is 'aggregated'."
+            )
+        return self
 
-class ClaimUpdate(BaseModel):
-    claim_text: Optional[str] = None
+
+class ObservationUpdate(BaseModel):
+    content: Optional[str] = None
+    content_type: Optional[ContentType] = None
+    source_modality: Optional[SourceModality] = None
+    epistemic_distance: Optional[EpistemicDistance] = None
+    collection_method: Optional[CollectionMethod] = None
+    epistemic_status: Optional[ObservationEpistemicStatus] = None
+    corroboration_level: Optional[CorroborationLevel] = None
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[SampleSizeTier] = None
+    sampling_method: Optional[SamplingMethod] = None
+    inclusion_criteria_documented: Optional[bool] = None
     verbatim: Optional[bool] = None
     page_ref: Optional[str] = None
-    timestamp_ref: Optional[str] = None
-    epistemic_status: Optional[EpistemicStatus] = None
-    claim_type: Optional[ClaimType] = None
-    tag_ids: Optional[List[int]] = None
+    tag_ids: Optional[List[uuid.UUID]] = None
 
 
-class ClaimRead(BaseModel):
+class ObservationRead(BaseModel):
     id: uuid.UUID
     source_id: uuid.UUID
     source_title: Optional[str] = None
-    claim_text: str
+    content: str
+    content_type: ContentType
+    source_modality: SourceModality
+    epistemic_distance: EpistemicDistance
+    collection_method: CollectionMethod
+    epistemic_status: ObservationEpistemicStatus
+    corroboration_level: CorroborationLevel
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[SampleSizeTier] = None
+    sampling_method: Optional[SamplingMethod] = None
+    inclusion_criteria_documented: Optional[bool] = None
     verbatim: bool
     page_ref: Optional[str] = None
-    timestamp_ref: Optional[str] = None
-    epistemic_status: EpistemicStatus
-    claim_type: ClaimType
-    ai_extracted: bool
-    ingestion_method: Optional[IngestionMethod] = None  # Phase 4
+    ingestion_method: Optional[IngestionMethod] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[str] = None
+    ai_extracted: bool
     tags: List[PhenomenonTagRead] = []
     created_at: datetime
     updated_at: datetime
@@ -307,14 +367,14 @@ class ClaimRead(BaseModel):
 
 # ── Review queue ──────────────────────────────────────────────────────────────
 
-class ClaimReview(BaseModel):
+class ObservationReview(BaseModel):
     """
-    Used by the ingestion review queue (Chat 4/6).
+    Used by the ingestion review queue.
     Reviewer can accept as-is, edit, or reject.
-    rejected → claim is deleted.
+    rejected → observation is deleted.
     """
     accepted: bool
-    edited_text: Optional[str] = None
-    epistemic_status: Optional[EpistemicStatus] = None
-    claim_type: Optional[ClaimType] = None
-    tag_ids: Optional[List[int]] = None
+    edited_content: Optional[str] = None
+    epistemic_status: Optional[ObservationEpistemicStatus] = None
+    content_type: Optional[ContentType] = None
+    tag_ids: Optional[List[uuid.UUID]] = None

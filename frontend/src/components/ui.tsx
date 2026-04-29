@@ -215,11 +215,11 @@ export function Input({ label, style, ...props }: InputProps) {
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
-  options: { value: string; label: string }[];
+  options?: { value: string; label: string }[];
   placeholder?: string;
 }
 
-export function Select({ label, options, placeholder, style, ...props }: SelectProps) {
+export function Select({ label, options, placeholder, style, children, ...props }: SelectProps) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {label && (
@@ -242,9 +242,9 @@ export function Select({ label, options, placeholder, style, ...props }: SelectP
         {...props}
       >
         {placeholder && <option value="">{placeholder}</option>}
-        {options.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
+        {options
+          ? options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)
+          : children}
       </select>
     </label>
   );

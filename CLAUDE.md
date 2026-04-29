@@ -170,6 +170,7 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 | **Chat 6** | Ingestion review queue UI (full reviewer UX) | ✅ Done |
 | **Chat 7** | Knowledge graph view (Cytoscape.js) | ✅ Done |
 | **Chat 8** | Hypothesis workspace (synthesis layer) | ✅ Done |
+| **Phase A** | Backend data model refactor: Claim→Observation, Hypothesis→{Hypothesis,TheoreticalFramework} | ✅ Done |
 
 ---
 
@@ -232,6 +233,57 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 - **`src/components/Shell.tsx`** — added `GRF` nav entry
 - **`src/api/index.ts`** — added `getRelationships()` typed API call
 - **`src/types/index.ts`** — added `ConceptRelationshipRead`, `RelationshipType` types
+
+### Phase A — Backend Data Model Refactor
+
+**Architecture:** Three-layer epistemic model now fully implemented.
+
+```
+CORPUS LAYER          OBSERVATION LAYER         SYNTHESIS LAYER
+(raw sources)    →    (epistemic atoms)      →  (built knowledge)
+Source                Observation                Hypothesis
+Account               ObservationReview          TheoreticalFramework
+PhenomenonTag                                    Concept / ConceptRelationship
+```
+
+**Enums added** (`backend/app/models/enums.py`):
+- `ObservationEpistemicStatus`: reported | corroborated | contested | artefactual | retracted
+- `ContentType`, `SourceModality`, `EpistemicDistance`, `CollectionMethod` — four-axis epistemic provenance
+- `SampleSizeTier`, `SamplingMethod` — aggregate study metadata
+- `HypothesisType`, `ConfidenceLevel`, `FrameworkStatus` — hypothesis layer
+- New `HypothesisStatus` (active | dormant | abandoned | merged | refuted — replaces old speculative/active)
+- `EpistemicStatus` retained (still used by Concept — will migrate in the Concept refactor phase)
+
+**Corpus layer** (`backend/app/models/corpus.py`):
+- `Claim` → `Observation` with full epistemic provenance (content_type, source_modality, epistemic_distance, collection_method, corroboration_level, sample fields)
+- `ObservationCreate` validator: aggregate fields only allowed when `epistemic_distance == aggregated`
+- `Source.claims` → `Source.observations`
+
+**Synthesis layer** (`backend/app/models/synthesis.py`):
+- Old `Hypothesis` replaced by new `Hypothesis` (observation-linked, with `hypothesis_type`, `falsification_condition`, `confidence_level`, `parent_hypothesis_id`)
+- New `TheoreticalFramework` (groups hypotheses by framework; `core_hypotheses` + `anomalous_hypotheses`)
+- `Concept` and `ConceptRelationship` retained; `supporting_claims` relationship dropped (Concept observation anchoring is a known follow-on phase)
+
+**API routes:**
+- `backend/app/api/routes/claims.py` → deleted
+- `backend/app/api/routes/observations.py` — full CRUD + review queue at `/api/v1/observations`
+- `backend/app/api/routes/hypotheses.py` — rewritten; `X-Warning-Anomalous` + `X-Warning-Falsification` headers
+- `backend/app/api/routes/frameworks.py` — new; full CRUD at `/api/v1/frameworks`; `X-Warning` header when anomalous_hypotheses empty
+- `backend/app/api/routes/sources.py` — sub-resource updated: `/{id}/claims` → `/{id}/observations`
+- `backend/app/api/routes/concepts.py` — `supporting_claim_ids` removed from Concept/Relationship schemas
+
+**Ingestion service** (`backend/app/services/ingestion.py`):
+- `ClaimDraft` → `ObservationDraft`; Claude extraction prompt updated for four-axis provenance schema
+- Extracted fields: `content`, `content_type`, `source_modality`, `epistemic_distance`, `collection_method`, `epistemic_status`, `page_ref`, `verbatim`
+
+**Migration** (`alembic/versions/0004_observation_hypothesis_framework.py`):
+- Creates 10 new enum types; drops `claim_type_enum`; replaces `hypothesis_status_enum`
+- Creates: `observations`, `observation_tags`, new `hypotheses`, 3 hypothesis join tables, `theoretical_frameworks`, 2 framework join tables
+- Drops: `claims`, `claim_tags`, `concept_supporting_claims`, `relationship_supporting_claims`, old `hypotheses`, all old hypothesis join tables
+
+**Known follow-on:** Concept layer — `concept_supporting_claims` was dropped in this migration. The ConceptRelationship graph will gain richer observation anchoring in a future phase.
+
+**Note on `import_excel.py`:** Still references old Claim schema. Needs its own refactor pass to map legacy Excel columns to the Observation model before re-import.
 
 ### Chat 8 — Hypothesis Workspace
 - **`src/components/HypothesisDetail.tsx`** — full hypothesis detail/edit page at `/hypotheses/:id`

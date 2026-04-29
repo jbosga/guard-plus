@@ -1,7 +1,7 @@
 """
 SQLAlchemy ORM models and Pydantic schemas for the synthesis layer.
 
-SQLAlchemy models: Concept, ConceptRelationship, Hypothesis, EpistemicNote
+SQLAlchemy models: Concept, ConceptRelationship, Hypothesis, TheoreticalFramework, EpistemicNote
 """
 from __future__ import annotations
 import uuid
@@ -18,47 +18,28 @@ from app.models.enums import (
     EpistemicStatus,
     ConceptType,
     RelationshipType, RelationshipStrength,
-    HypothesisFramework, AssumedOntology, HypothesisStatus,
+    HypothesisFramework, AssumedOntology,
+    HypothesisType, HypothesisStatus, ConfidenceLevel,
+    FrameworkStatus,
     EpistemicNoteType, AttachableEntityType,
 )
-from app.models.corpus import Claim, ClaimRead
+from app.models.corpus import Observation, ObservationRead
 
 
 # ── Association tables ────────────────────────────────────────────────────────
 
-concept_supporting_claims = Table(
-    "concept_supporting_claims",
-    Base.metadata,
-    Column("concept_id", UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE"), primary_key=True),
-    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
-)
-
-relationship_supporting_claims = Table(
-    "relationship_supporting_claims",
-    Base.metadata,
-    Column("relationship_id", UUID(as_uuid=True), ForeignKey("concept_relationships.id", ondelete="CASCADE"), primary_key=True),
-    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
-)
-
-hypothesis_scope_claims = Table(
-    "hypothesis_scope_claims",
+hypothesis_supporting_observations = Table(
+    "hypothesis_supporting_observations",
     Base.metadata,
     Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
-    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+    Column("observation_id", UUID(as_uuid=True), ForeignKey("observations.id", ondelete="CASCADE"), primary_key=True),
 )
 
-hypothesis_supporting_claims = Table(
-    "hypothesis_supporting_claims",
+hypothesis_anomalous_observations = Table(
+    "hypothesis_anomalous_observations",
     Base.metadata,
     Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
-    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
-)
-
-hypothesis_anomalous_claims = Table(
-    "hypothesis_anomalous_claims",
-    Base.metadata,
-    Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
-    Column("claim_id", UUID(as_uuid=True), ForeignKey("claims.id", ondelete="CASCADE"), primary_key=True),
+    Column("observation_id", UUID(as_uuid=True), ForeignKey("observations.id", ondelete="CASCADE"), primary_key=True),
 )
 
 hypothesis_competitors = Table(
@@ -66,6 +47,20 @@ hypothesis_competitors = Table(
     Base.metadata,
     Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
     Column("competitor_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
+)
+
+framework_core_hypotheses = Table(
+    "framework_core_hypotheses",
+    Base.metadata,
+    Column("framework_id", UUID(as_uuid=True), ForeignKey("theoretical_frameworks.id", ondelete="CASCADE"), primary_key=True),
+    Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
+)
+
+framework_anomalous_hypotheses = Table(
+    "framework_anomalous_hypotheses",
+    Base.metadata,
+    Column("framework_id", UUID(as_uuid=True), ForeignKey("theoretical_frameworks.id", ondelete="CASCADE"), primary_key=True),
+    Column("hypothesis_id", UUID(as_uuid=True), ForeignKey("hypotheses.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -84,8 +79,6 @@ class Concept(Base, TimestampMixin):
         Enum(EpistemicStatus, name="epistemic_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False, server_default="asserted"
     )
-
-    supporting_claims: Mapped[List[Claim]] = relationship("Claim", secondary=concept_supporting_claims)
 
 
 class ConceptRelationship(Base, TimestampMixin):
@@ -106,8 +99,6 @@ class ConceptRelationship(Base, TimestampMixin):
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    supporting_claims: Mapped[List[Claim]] = relationship("Claim", secondary=relationship_supporting_claims)
-
 
 class Hypothesis(Base, TimestampMixin):
     __tablename__ = "hypotheses"
@@ -115,25 +106,87 @@ class Hypothesis(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     label: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    hypothesis_type: Mapped[HypothesisType] = mapped_column(
+        Enum(HypothesisType, name="hypothesis_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    falsification_condition: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scope: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     framework: Mapped[HypothesisFramework] = mapped_column(
-        Enum(HypothesisFramework, name="hypothesis_framework_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True
+        Enum(HypothesisFramework, name="hypothesis_framework_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, index=True,
     )
     assumed_ontologies: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
-    required_assumptions: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+
     status: Mapped[HypothesisStatus] = mapped_column(
         Enum(HypothesisStatus, name="hypothesis_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
-        nullable=False, server_default="active", index=True
+        nullable=False, server_default="active", index=True,
+    )
+    confidence_level: Mapped[ConfidenceLevel] = mapped_column(
+        Enum(ConfidenceLevel, name="confidence_level_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="speculative",
+    )
+
+    parent_hypothesis_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("hypotheses.id"), nullable=True
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    scope_claims: Mapped[List[Claim]] = relationship("Claim", secondary=hypothesis_scope_claims)
-    supporting_claims: Mapped[List[Claim]] = relationship("Claim", secondary=hypothesis_supporting_claims)
-    anomalous_claims: Mapped[List[Claim]] = relationship("Claim", secondary=hypothesis_anomalous_claims)
+    supporting_observations: Mapped[List[Observation]] = relationship(
+        "Observation", secondary=hypothesis_supporting_observations
+    )
+    anomalous_observations: Mapped[List[Observation]] = relationship(
+        "Observation", secondary=hypothesis_anomalous_observations
+    )
     competing_hypotheses: Mapped[List["Hypothesis"]] = relationship(
         "Hypothesis",
         secondary=hypothesis_competitors,
         primaryjoin=lambda: Hypothesis.id == hypothesis_competitors.c.hypothesis_id,
         secondaryjoin=lambda: Hypothesis.id == hypothesis_competitors.c.competitor_id,
+    )
+    parent: Mapped[Optional["Hypothesis"]] = relationship(
+        "Hypothesis",
+        foreign_keys=[parent_hypothesis_id],
+        back_populates="children",
+        remote_side=[id],
+    )
+    children: Mapped[List["Hypothesis"]] = relationship(
+        "Hypothesis",
+        foreign_keys=[parent_hypothesis_id],
+        back_populates="parent",
+    )
+
+
+class TheoreticalFramework(Base, TimestampMixin):
+    __tablename__ = "theoretical_frameworks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    label: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    framework_type: Mapped[HypothesisFramework] = mapped_column(
+        Enum(HypothesisFramework, name="hypothesis_framework_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    assumed_ontologies: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+
+    status: Mapped[FrameworkStatus] = mapped_column(
+        Enum(FrameworkStatus, name="framework_status_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="active",
+    )
+    confidence_level: Mapped[ConfidenceLevel] = mapped_column(
+        Enum(ConfidenceLevel, name="confidence_level_enum", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False, server_default="speculative",
+    )
+
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    core_hypotheses: Mapped[List[Hypothesis]] = relationship(
+        "Hypothesis", secondary=framework_core_hypotheses
+    )
+    anomalous_hypotheses: Mapped[List[Hypothesis]] = relationship(
+        "Hypothesis", secondary=framework_anomalous_hypotheses
     )
 
 
@@ -159,7 +212,6 @@ class ConceptCreate(BaseModel):
     concept_type: ConceptType
     description: Optional[str] = None
     epistemic_status: EpistemicStatus = EpistemicStatus.SPECULATIVE
-    supporting_claim_ids: List[int] = []
 
 
 class ConceptUpdate(BaseModel):
@@ -167,11 +219,10 @@ class ConceptUpdate(BaseModel):
     concept_type: Optional[ConceptType] = None
     description: Optional[str] = None
     epistemic_status: Optional[EpistemicStatus] = None
-    supporting_claim_ids: Optional[List[int]] = None
 
 
 class ConceptRead(BaseModel):
-    id: int
+    id: uuid.UUID
     label: str
     concept_type: ConceptType
     description: Optional[str] = None
@@ -185,25 +236,23 @@ class ConceptRead(BaseModel):
 # ── ConceptRelationship ───────────────────────────────────────────────────────
 
 class ConceptRelationshipCreate(BaseModel):
-    source_concept_id: int
-    target_concept_id: int
+    source_concept_id: uuid.UUID
+    target_concept_id: uuid.UUID
     relationship_type: RelationshipType
     strength: RelationshipStrength = RelationshipStrength.MODERATE
     notes: Optional[str] = None
-    supporting_claim_ids: List[int] = []
 
 
 class ConceptRelationshipUpdate(BaseModel):
     relationship_type: Optional[RelationshipType] = None
     strength: Optional[RelationshipStrength] = None
     notes: Optional[str] = None
-    supporting_claim_ids: Optional[List[int]] = None
 
 
 class ConceptRelationshipRead(BaseModel):
-    id: int
-    source_concept_id: int
-    target_concept_id: int
+    id: uuid.UUID
+    source_concept_id: uuid.UUID
+    target_concept_id: uuid.UUID
     relationship_type: RelationshipType
     strength: Optional[RelationshipStrength] = None
     notes: Optional[str] = None
@@ -218,48 +267,54 @@ class ConceptRelationshipRead(BaseModel):
 class HypothesisCreate(BaseModel):
     label: str
     description: Optional[str] = None
+    hypothesis_type: HypothesisType
+    falsification_condition: Optional[str] = None
+    scope: Optional[str] = None
     framework: HypothesisFramework
     assumed_ontologies: Optional[List[AssumedOntology]] = None
-    required_assumptions: Optional[List[uuid.UUID]] = None
     status: HypothesisStatus = HypothesisStatus.ACTIVE
+    confidence_level: ConfidenceLevel = ConfidenceLevel.SPECULATIVE
+    parent_hypothesis_id: Optional[uuid.UUID] = None
     notes: Optional[str] = None
-    scope_claim_ids: List[uuid.UUID] = []
-    supporting_claim_ids: List[uuid.UUID] = []
-    anomalous_claim_ids: List[uuid.UUID] = []          # structurally required; enforced below
+    supporting_observation_ids: List[uuid.UUID] = []
+    anomalous_observation_ids: List[uuid.UUID] = []
     competing_hypothesis_ids: List[uuid.UUID] = []
 
     @model_validator(mode="after")
-    def anomalous_claims_warning(self) -> "HypothesisCreate":
-        # Soft enforcement: flag if empty but don't hard-reject.
-        # Early-stage hypotheses may not yet have anomalous claims identified.
-        # The API response will include a warning header (see route).
-        self._anomalous_empty = len(self.anomalous_claim_ids) == 0
+    def check_warnings(self) -> "HypothesisCreate":
+        self._anomalous_empty = len(self.anomalous_observation_ids) == 0
+        self._falsification_empty = not self.falsification_condition
         return self
 
 
 class HypothesisUpdate(BaseModel):
     label: Optional[str] = None
     description: Optional[str] = None
+    hypothesis_type: Optional[HypothesisType] = None
+    falsification_condition: Optional[str] = None
+    scope: Optional[str] = None
     framework: Optional[HypothesisFramework] = None
     assumed_ontologies: Optional[List[AssumedOntology]] = None
-    required_assumptions: Optional[List[str]] = None
     status: Optional[HypothesisStatus] = None
+    confidence_level: Optional[ConfidenceLevel] = None
+    parent_hypothesis_id: Optional[uuid.UUID] = None
     notes: Optional[str] = None
-    scope_claim_ids: Optional[List[uuid.UUID]] = None
-    supporting_claim_ids: Optional[List[uuid.UUID]] = None
-    anomalous_claim_ids: Optional[List[uuid.UUID]] = None
+    supporting_observation_ids: Optional[List[uuid.UUID]] = None
+    anomalous_observation_ids: Optional[List[uuid.UUID]] = None
     competing_hypothesis_ids: Optional[List[uuid.UUID]] = None
 
 
 class HypothesisList(BaseModel):
-    """Lightweight list view with counts instead of full claim lists."""
+    """Lightweight list view with counts instead of full observation lists."""
     id: uuid.UUID
     label: str
+    hypothesis_type: HypothesisType
     framework: HypothesisFramework
     status: HypothesisStatus
+    confidence_level: ConfidenceLevel
     assumed_ontologies: Optional[List[AssumedOntology]] = None
-    supporting_claim_count: int = 0
-    anomalous_claim_count: int = 0
+    supporting_observation_count: int = 0
+    anomalous_observation_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -267,13 +322,70 @@ class HypothesisList(BaseModel):
 
 
 class HypothesisRead(HypothesisList):
-    """Full detail view — includes all claim lists."""
+    """Full detail view — includes all observation lists."""
     description: Optional[str] = None
-    required_assumptions: Optional[List[str]] = None
+    falsification_condition: Optional[str] = None
+    scope: Optional[str] = None
+    parent_hypothesis_id: Optional[uuid.UUID] = None
     notes: Optional[str] = None
-    scope_claims: List[ClaimRead] = []
-    supporting_claims: List[ClaimRead] = []
-    anomalous_claims: List[ClaimRead] = []       # surfaced prominently in UI
+    supporting_observations: List[ObservationRead] = []
+    anomalous_observations: List[ObservationRead] = []
+    competing_hypotheses: List[HypothesisList] = []
+
+
+# ── TheoreticalFramework ──────────────────────────────────────────────────────
+
+class TheoreticalFrameworkCreate(BaseModel):
+    label: str
+    description: Optional[str] = None
+    framework_type: HypothesisFramework
+    assumed_ontologies: Optional[List[AssumedOntology]] = None
+    status: FrameworkStatus = FrameworkStatus.ACTIVE
+    confidence_level: ConfidenceLevel = ConfidenceLevel.SPECULATIVE
+    notes: Optional[str] = None
+    core_hypothesis_ids: List[uuid.UUID] = []
+    anomalous_hypothesis_ids: List[uuid.UUID] = []
+
+    @model_validator(mode="after")
+    def check_warnings(self) -> "TheoreticalFrameworkCreate":
+        self._anomalous_empty = len(self.anomalous_hypothesis_ids) == 0
+        return self
+
+
+class TheoreticalFrameworkUpdate(BaseModel):
+    label: Optional[str] = None
+    description: Optional[str] = None
+    framework_type: Optional[HypothesisFramework] = None
+    assumed_ontologies: Optional[List[AssumedOntology]] = None
+    status: Optional[FrameworkStatus] = None
+    confidence_level: Optional[ConfidenceLevel] = None
+    notes: Optional[str] = None
+    core_hypothesis_ids: Optional[List[uuid.UUID]] = None
+    anomalous_hypothesis_ids: Optional[List[uuid.UUID]] = None
+
+
+class TheoreticalFrameworkList(BaseModel):
+    """Lightweight list view."""
+    id: uuid.UUID
+    label: str
+    framework_type: HypothesisFramework
+    status: FrameworkStatus
+    confidence_level: ConfidenceLevel
+    assumed_ontologies: Optional[List[AssumedOntology]] = None
+    core_hypothesis_count: int = 0
+    anomalous_hypothesis_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TheoreticalFrameworkRead(TheoreticalFrameworkList):
+    """Full detail view."""
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    core_hypotheses: List[HypothesisList] = []
+    anomalous_hypotheses: List[HypothesisList] = []
 
 
 # ── EpistemicNote ─────────────────────────────────────────────────────────────

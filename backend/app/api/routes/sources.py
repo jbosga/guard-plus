@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.db.session import get_db
-from app.models.corpus import Source, Account, Claim
+from app.models.corpus import Source, Account, Observation
 from app.models.enums import SourceType, DisciplinaryFrame, ProvenanceQuality
 from app.models.user import User
 from app.models.corpus import (
-    SourceCreate, SourceUpdate, SourceList, SourceRead, ClaimRead,
+    SourceCreate, SourceUpdate, SourceList, SourceRead, ObservationRead,
 )
 from app.models.common import Page
 from app.core.security import get_current_user
@@ -36,19 +36,19 @@ def _get_or_404(source_id: uuid.UUID, db: Session) -> Source:
     return source
 
 
-def _claim_count(source_id: uuid.UUID, db: Session) -> int:
-    return db.query(func.count(Claim.id)).filter(Claim.source_id == source_id).scalar() or 0
+def _observation_count(source_id: uuid.UUID, db: Session) -> int:
+    return db.query(func.count(Observation.id)).filter(Observation.source_id == source_id).scalar() or 0
 
 
 def _to_source_list(source: Source, db: Session) -> SourceList:
     d = SourceList.model_validate(source)
-    d.claim_count = _claim_count(source.id, db)
+    d.observation_count = _observation_count(source.id, db)
     return d
 
 
 def _to_source_read(source: Source, db: Session) -> SourceRead:
     d = SourceRead.model_validate(source)
-    d.claim_count = _claim_count(source.id, db)
+    d.observation_count = _observation_count(source.id, db)
     return d
 
 
@@ -74,7 +74,6 @@ def list_sources(
     if provenance_quality:
         q = q.filter(Source.provenance_quality == provenance_quality)
     if search:
-        # PostgreSQL tsvector full-text search
         q = q.filter(
             func.to_tsvector("english", func.coalesce(Source.title, "") + " " + func.coalesce(Source.raw_text, ""))
             .op("@@")(func.plainto_tsquery("english", search))
@@ -116,7 +115,7 @@ def create_source(
         notes=source_in.notes,
     )
     db.add(source)
-    db.flush()  # populate source.id before creating Account
+    db.flush()
 
     if source_in.source_type == SourceType.ACCOUNT and source_in.account_detail:
         acct_data = source_in.account_detail.model_dump()
@@ -165,7 +164,6 @@ def delete_source(
     current_user: User = Depends(get_current_user),
 ):
     source = _get_or_404(source_id, db)
-    # Clean up attached file
     if source.file_ref:
         path = os.path.join(settings.storage_path, source.file_ref)
         if os.path.exists(path):
@@ -178,12 +176,12 @@ def delete_source(
 
 @router.post("/{source_id}/upload", response_model=dict)
 def upload_file(
-    source_id:  uuid.UUID,
+    source_id: uuid.UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Attach an original file to a source. Used by the ingestion pipeline (Chat 4)."""
+    """Attach an original file to a source for the ingestion pipeline."""
     source = _get_or_404(source_id, db)
 
     if file.content_type not in ALLOWED_UPLOAD_TYPES:
@@ -205,21 +203,21 @@ def upload_file(
     return {"file_ref": filename}
 
 
-# ── Claims sub-resource ───────────────────────────────────────────────────────
+# ── Observations sub-resource ─────────────────────────────────────────────────
 
-@router.get("/{source_id}/claims", response_model=list[ClaimRead])
-def get_source_claims(
+@router.get("/{source_id}/observations", response_model=list[ObservationRead])
+def get_source_observations(
     source_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Convenience: all claims for a given source, ordered by page_ref."""
+    """All observations for a given source, ordered by page_ref."""
     _get_or_404(source_id, db)
-    claims = (
-        db.query(Claim)
-        .filter(Claim.source_id == source_id)
-        .order_by(Claim.page_ref)
+    observations = (
+        db.query(Observation)
+        .filter(Observation.source_id == source_id)
+        .order_by(Observation.page_ref)
         .all()
     )
-    from app.api.routes.claims import _to_claim_read
-    return [_to_claim_read(c) for c in claims]
+    from app.api.routes.observations import _to_observation_read
+    return [_to_observation_read(o) for o in observations]

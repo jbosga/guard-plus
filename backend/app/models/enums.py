@@ -45,6 +45,7 @@ class CorroborationLevel(str, enum.Enum):
     INVESTIGATOR = "investigator"
     MULTIPLE = "multiple"
 
+# Retained for Concept.epistemic_status — will migrate in the Concept refactor phase
 class EpistemicStatus(str, enum.Enum):
     ASSERTED = "asserted"
     OBSERVED = "observed"
@@ -52,13 +53,6 @@ class EpistemicStatus(str, enum.Enum):
     SPECULATIVE = "speculative"
     CONTESTED = "contested"
     RETRACTED = "retracted"
-
-class ClaimType(str, enum.Enum):
-    PHENOMENOLOGICAL = "phenomenological"
-    CAUSAL = "causal"
-    CORRELATIONAL = "correlational"
-    DEFINITIONAL = "definitional"
-    METHODOLOGICAL = "methodological"
 
 class TagCategory(str, enum.Enum):
     PERCEPTUAL = "perceptual"
@@ -109,12 +103,6 @@ class AssumedOntology(str, enum.Enum):
     UNKNOWN = "unknown"
     NOVEL = "novel"
 
-class HypothesisStatus(str, enum.Enum):
-    ACTIVE = "active"
-    ABANDONED = "abandoned"
-    MERGED = "merged"
-    SPECULATIVE = "speculative"
-
 class EpistemicNoteType(str, enum.Enum):
     METHODOLOGICAL_CONCERN = "methodological_concern"
     REPLICATION = "replication"
@@ -129,15 +117,97 @@ class AttachableEntityType(str, enum.Enum):
     CONCEPT_RELATIONSHIP = "concept_relationship"
     SOURCE = "source"
 
-# ── Phase 4 additions ─────────────────────────────────────────────────────────
-
 class IngestionStatus(str, enum.Enum):
-    PENDING = "pending"       # file uploaded, ingest not yet triggered
-    PROCESSING = "processing" # pipeline running
-    COMPLETE = "complete"     # claims written, ready for review (AI) or done (manual)
-    FAILED = "failed"         # pipeline error; see source.ingestion_error
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETE = "complete"
+    FAILED = "failed"
 
 class IngestionMethod(str, enum.Enum):
-    AI = "ai"                 # Claude API extraction → review queue
-    MANUAL = "manual"         # researcher enters claims directly
-    BULK_IMPORT = "bulk_import"  # Excel import script (retroactively labelled)
+    AI = "ai"
+    MANUAL = "manual"
+    BULK_IMPORT = "bulk_import"
+
+# ── New enums: Observation layer ──────────────────────────────────────────────
+
+class ObservationEpistemicStatus(str, enum.Enum):
+    REPORTED = "reported"
+    CORROBORATED = "corroborated"
+    CONTESTED = "contested"
+    ARTEFACTUAL = "artefactual"
+    RETRACTED = "retracted"
+
+class ContentType(str, enum.Enum):
+    EXPERIENTIAL = "experiential"
+    BEHAVIORAL = "behavioral"
+    PHYSIOLOGICAL = "physiological"
+    ENVIRONMENTAL = "environmental"
+    TESTIMONIAL = "testimonial"
+    DOCUMENTARY_TRACE = "documentary_trace"
+
+class SourceModality(str, enum.Enum):
+    FIRST_PERSON_VERBAL = "first_person_verbal"
+    INVESTIGATOR_SUMMARY = "investigator_summary"
+    PHYSIOLOGICAL = "physiological"
+    BEHAVIORAL = "behavioral"
+    DOCUMENTARY = "documentary"
+    AGGREGATE_STATISTICAL = "aggregate_statistical"
+
+class EpistemicDistance(str, enum.Enum):
+    DIRECT = "direct"
+    SUMMARIZED = "summarized"
+    AGGREGATED = "aggregated"
+    DERIVED = "derived"
+
+class CollectionMethod(str, enum.Enum):
+    SPONTANEOUS_REPORT = "spontaneous_report"
+    STRUCTURED_INTERVIEW = "structured_interview"
+    HYPNOTIC_REGRESSION = "hypnotic_regression"
+    QUESTIONNAIRE = "questionnaire"
+    CLINICAL_ASSESSMENT = "clinical_assessment"
+    PASSIVE_RECORDING = "passive_recording"
+    INVESTIGATOR_INFERENCE = "investigator_inference"
+
+class SampleSizeTier(str, enum.Enum):
+    SINGLE_CASE = "single_case"
+    SMALL = "small"
+    MODERATE = "moderate"
+    LARGE = "large"
+    POPULATION = "population"
+
+class SamplingMethod(str, enum.Enum):
+    SELF_SELECTED = "self_selected"
+    INVESTIGATOR_REFERRED = "investigator_referred"
+    CLINICAL = "clinical"
+    SURVEY = "survey"
+    CONVENIENCE = "convenience"
+    UNKNOWN = "unknown"
+
+# ── New enums: Hypothesis layer ───────────────────────────────────────────────
+
+class HypothesisType(str, enum.Enum):
+    CAUSAL = "causal"
+    CORRELATIONAL = "correlational"
+    MECHANISTIC = "mechanistic"
+    TAXONOMIC = "taxonomic"
+    PREDICTIVE = "predictive"
+
+class HypothesisStatus(str, enum.Enum):
+    ACTIVE = "active"
+    DORMANT = "dormant"
+    ABANDONED = "abandoned"
+    MERGED = "merged"
+    REFUTED = "refuted"
+
+class ConfidenceLevel(str, enum.Enum):
+    SPECULATIVE = "speculative"
+    PLAUSIBLE = "plausible"
+    SUPPORTED = "supported"
+    CONTESTED = "contested"
+
+class FrameworkStatus(str, enum.Enum):
+    ACTIVE = "active"
+    DORMANT = "dormant"
+    ABANDONED = "abandoned"
+    MERGED = "merged"
+    REFUTED = "refuted"

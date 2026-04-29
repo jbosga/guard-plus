@@ -1,18 +1,16 @@
 """
-Ingestion endpoint — Phase 4.
+Ingestion endpoint — Phase 4 (updated for Observation model in Phase A refactor).
 
 POST /api/v1/sources/{source_id}/ingest
 
 AI path:
   - Accepts immediately (202), runs pipeline in a BackgroundTask
   - Poll GET /api/v1/sources/{source_id} for ingestion_status
-  - Draft claims appear in GET /api/v1/claims/review-queue as they are inserted
+  - Draft observations appear in GET /api/v1/observations/review-queue
 
 Manual path:
-  - If request includes claims[], inserts them immediately and returns 201
-  - If no claims[], returns 200 with source metadata for the frontend form
-    (Phase 5/6 will render the manual entry form against this response)
-  - Text extraction still runs if file_ref is set (populates raw_text)
+  - If request includes observations[], inserts them immediately and returns 201
+  - If no observations[], returns 200 with source metadata for the frontend form
 """
 
 from typing import Optional
@@ -24,30 +22,34 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
 from app.db.session import get_db
-from app.models.corpus import Claim, Source
-from app.models.enums import ClaimType, EpistemicStatus, IngestionMethod, IngestionStatus
+from app.models.corpus import Observation, Source
+from app.models.enums import (
+    ContentType, SourceModality, EpistemicDistance, CollectionMethod,
+    ObservationEpistemicStatus, IngestionMethod, IngestionStatus,
+)
 from app.models.user import User
-from app.services.ingestion import ClaimDraft, IngestionResult, run_ingestion
+from app.services.ingestion import ObservationDraft, IngestionResult, run_ingestion
 
 router = APIRouter(prefix="/sources", tags=["ingestion"])
 
 
 # ── Request / response schemas ────────────────────────────────────────────────
 
-class ManualClaimIn(BaseModel):
-    """A single manually-entered claim submitted alongside the ingest request."""
-    claim_text: str
-    claim_type: ClaimType
-    epistemic_status: EpistemicStatus = EpistemicStatus.ASSERTED
+class ManualObservationIn(BaseModel):
+    """A single manually-entered observation submitted alongside the ingest request."""
+    content: str
+    content_type: ContentType
+    source_modality: SourceModality
+    epistemic_distance: EpistemicDistance
+    collection_method: CollectionMethod
+    epistemic_status: ObservationEpistemicStatus = ObservationEpistemicStatus.REPORTED
     page_ref: Optional[str] = None
     verbatim: bool = False
 
 
 class IngestRequest(BaseModel):
     method: IngestionMethod = IngestionMethod.AI
-    # Manual claims can be submitted now, or later via the claims endpoint.
-    # Omitting this field opens the manual entry form in the frontend.
-    claims: Optional[list[ManualClaimIn]] = None
+    observations: Optional[list[ManualObservationIn]] = None
 
 
 class IngestResponse(BaseModel):
@@ -55,9 +57,8 @@ class IngestResponse(BaseModel):
     method: IngestionMethod
     status: IngestionStatus
     message: str
-    claims_inserted: int = 0
+    observations_inserted: int = 0
     ocr_pages: int = 0
-    # Populated for manual/no-file case so frontend can open the entry form
     source_title: Optional[str] = None
     has_raw_text: bool = False
 
@@ -65,10 +66,6 @@ class IngestResponse(BaseModel):
 # ── Background task wrapper ───────────────────────────────────────────────────
 
 def _run_ai_ingestion_background(source_id: UUID, db_url: str) -> None:
-    """
-    Runs in a BackgroundTask. Creates its own DB session because the
-    request session will be closed by the time this executes.
-    """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
@@ -79,7 +76,7 @@ def _run_ai_ingestion_background(source_id: UUID, db_url: str) -> None:
     try:
         source = db.query(Source).filter(Source.id == source_id).first()
         if not source:
-            return  # source deleted between request and background run
+            return
 
         run_ingestion(
             source=source,
@@ -99,18 +96,18 @@ def _run_ai_ingestion_background(source_id: UUID, db_url: str) -> None:
     status_code=status.HTTP_202_ACCEPTED,
     summary="Trigger ingestion pipeline for a source",
     description="""
-Trigger text extraction and optional claim extraction for an uploaded source.
+Trigger text extraction and optional observation extraction for an uploaded source.
 
 **AI path** (`method: "ai"`):
 - Requires a file to have been uploaded via `POST /{source_id}/upload`
 - Returns 202 immediately; pipeline runs as a background task
 - Poll `GET /sources/{source_id}` for `ingestion_status`
-- Extracted claims appear in `GET /claims/review-queue`
+- Extracted observations appear in `GET /observations/review-queue`
 
 **Manual path** (`method: "manual"`):
 - File upload is optional (text extraction runs if a file exists)
-- If `claims` array is provided: inserted immediately, returns 201
-- If `claims` is omitted: returns 200 with source metadata for the frontend entry form
+- If `observations` array is provided: inserted immediately, returns 201
+- If `observations` is omitted: returns 200 with source metadata
 """,
 )
 def ingest_source(
@@ -124,7 +121,6 @@ def ingest_source(
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    # Guard: don't allow re-triggering while already processing
     if source.ingestion_status == IngestionStatus.PROCESSING:
         raise HTTPException(
             status_code=409,
@@ -142,8 +138,6 @@ def ingest_source(
                 ),
             )
 
-        # Mark pending before background task starts so concurrent requests
-        # hit the 409 guard above
         source.ingestion_status = IngestionStatus.PENDING
         db.commit()
 
@@ -159,7 +153,7 @@ def ingest_source(
             message=(
                 "Ingestion queued. Pipeline is running in the background. "
                 "Poll GET /sources/{source_id} for status updates. "
-                "Extracted claims will appear in GET /claims/review-queue."
+                "Extracted observations will appear in GET /observations/review-queue."
             ),
             source_title=source.title,
             has_raw_text=bool(source.raw_text),
@@ -168,8 +162,8 @@ def ingest_source(
     # ── Manual path ───────────────────────────────────────────────────────────
     if request.method == IngestionMethod.MANUAL:
         manual_dicts = (
-            [c.model_dump() for c in request.claims]
-            if request.claims else None
+            [o.model_dump() for o in request.observations]
+            if request.observations else None
         )
 
         result: IngestionResult = run_ingestion(
@@ -177,28 +171,27 @@ def ingest_source(
             method=IngestionMethod.MANUAL,
             db=db,
             reviewer_username=current_user.username,
-            manual_claims=manual_dicts,
+            manual_observations=manual_dicts,
         )
 
         if result.status == IngestionStatus.FAILED:
             raise HTTPException(status_code=500, detail=result.error)
 
-        no_claims_submitted = not request.claims
+        no_obs_submitted = not request.observations
 
         return IngestResponse(
             source_id=source_id,
             method=IngestionMethod.MANUAL,
             status=result.status,
             message=(
-                "Text extracted. Open the manual entry form to add claims."
-                if no_claims_submitted
-                else f"{result.claims_inserted} claim(s) recorded."
+                "Text extracted. Open the manual entry form to add observations."
+                if no_obs_submitted
+                else f"{result.observations_inserted} observation(s) recorded."
             ),
-            claims_inserted=result.claims_inserted,
+            observations_inserted=result.observations_inserted,
             ocr_pages=result.ocr_pages,
             source_title=source.title,
             has_raw_text=bool(source.raw_text),
         )
 
-    # Unreachable — pydantic validates method enum — but satisfies type checker
     raise HTTPException(status_code=400, detail="Unknown ingestion method")

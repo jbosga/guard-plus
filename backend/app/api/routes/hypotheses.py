@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.synthesis import Hypothesis
-from app.models.corpus import Claim
+from app.models.corpus import Observation
 from app.models.enums import HypothesisFramework, HypothesisStatus
 from app.models.user import User
 from app.models.synthesis import (
@@ -18,11 +18,6 @@ from app.core.security import get_current_user
 
 router = APIRouter(prefix="/hypotheses", tags=["hypotheses"])
 
-ANOMALOUS_EMPTY_WARNING = (
-    "X-Warning: hypothesis created without anomalous_claims. "
-    "Every hypothesis should declare what it cannot explain."
-)
-
 
 def _get_or_404(hypothesis_id: UUID, db: Session) -> Hypothesis:
     h = db.query(Hypothesis).filter(Hypothesis.id == hypothesis_id).first()
@@ -31,15 +26,15 @@ def _get_or_404(hypothesis_id: UUID, db: Session) -> Hypothesis:
     return h
 
 
-def _resolve_claims(claim_ids: list[UUID], db: Session) -> list[Claim]:
-    if not claim_ids:
+def _resolve_observations(obs_ids: list[UUID], db: Session) -> list[Observation]:
+    if not obs_ids:
         return []
-    claims = db.query(Claim).filter(Claim.id.in_(claim_ids)).all()
-    found = {c.id for c in claims}
-    missing = set(claim_ids) - found
+    items = db.query(Observation).filter(Observation.id.in_(obs_ids)).all()
+    found = {o.id for o in items}
+    missing = set(obs_ids) - found
     if missing:
-        raise HTTPException(status_code=400, detail=f"Claim IDs not found: {sorted(missing)}")
-    return claims
+        raise HTTPException(status_code=400, detail=f"Observation IDs not found: {sorted(str(m) for m in missing)}")
+    return items
 
 
 def _resolve_hypotheses(ids: list[UUID], db: Session) -> list[Hypothesis]:
@@ -49,31 +44,43 @@ def _resolve_hypotheses(ids: list[UUID], db: Session) -> list[Hypothesis]:
     found = {h.id for h in items}
     missing = set(ids) - found
     if missing:
-        raise HTTPException(status_code=400, detail=f"Hypothesis IDs not found: {sorted(missing)}")
+        raise HTTPException(status_code=400, detail=f"Hypothesis IDs not found: {sorted(str(m) for m in missing)}")
     return items
 
 
 def _to_list(h: Hypothesis) -> HypothesisList:
     d = HypothesisList.model_validate(h)
-    d.supporting_claim_count = len(h.supporting_claims)
-    d.anomalous_claim_count = len(h.anomalous_claims)
+    d.supporting_observation_count = len(h.supporting_observations)
+    d.anomalous_observation_count = len(h.anomalous_observations)
     if h.assumed_ontologies:
         d.assumed_ontologies = json.loads(h.assumed_ontologies) if isinstance(h.assumed_ontologies, str) else h.assumed_ontologies
     return d
 
 
 def _to_read(h: Hypothesis) -> HypothesisRead:
-    from app.models.corpus import ClaimRead
+    from app.models.corpus import ObservationRead
     d = HypothesisRead.model_validate(h)
-    d.supporting_claim_count = len(h.supporting_claims)
-    d.anomalous_claim_count = len(h.anomalous_claims)
-    d.scope_claims = [ClaimRead.model_validate(c) for c in h.scope_claims]
-    d.supporting_claims = [ClaimRead.model_validate(c) for c in h.supporting_claims]
-    d.anomalous_claims = [ClaimRead.model_validate(c) for c in h.anomalous_claims]
-    d.required_assumptions = [ClaimRead.model_validate(c) for c in h.required_assumptions] if h.required_assumptions else []
+    d.supporting_observation_count = len(h.supporting_observations)
+    d.anomalous_observation_count = len(h.anomalous_observations)
+    d.supporting_observations = [ObservationRead.model_validate(o) for o in h.supporting_observations]
+    d.anomalous_observations = [ObservationRead.model_validate(o) for o in h.anomalous_observations]
+    d.competing_hypotheses = [_to_list(c) for c in h.competing_hypotheses]
     if h.assumed_ontologies:
         d.assumed_ontologies = json.loads(h.assumed_ontologies) if isinstance(h.assumed_ontologies, str) else h.assumed_ontologies
     return d
+
+
+def _set_warning_headers(response: Response, h: Hypothesis) -> None:
+    if len(h.anomalous_observations) == 0:
+        response.headers["X-Warning-Anomalous"] = (
+            "Hypothesis has no anomalous_observations. "
+            "Every hypothesis should declare what it cannot explain."
+        )
+    if not h.falsification_condition:
+        response.headers["X-Warning-Falsification"] = (
+            "Hypothesis has no falsification_condition. "
+            "Every hypothesis should state what evidence would refute it."
+        )
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
@@ -113,29 +120,26 @@ def create_hypothesis(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Soft enforcement: warn if anomalous_claims is empty
-    if not hyp_in.anomalous_claim_ids:
-        response.headers["X-Warning"] = (
-            "Hypothesis created without anomalous_claims. "
-            "Every hypothesis should declare what it cannot explain."
-        )
-
     hyp = Hypothesis(
         label=hyp_in.label,
         description=hyp_in.description,
+        hypothesis_type=hyp_in.hypothesis_type,
+        falsification_condition=hyp_in.falsification_condition,
+        scope=hyp_in.scope,
         framework=hyp_in.framework,
         assumed_ontologies=hyp_in.assumed_ontologies,
-        required_assumptions=hyp_in.required_assumptions,
         status=hyp_in.status,
+        confidence_level=hyp_in.confidence_level,
+        parent_hypothesis_id=hyp_in.parent_hypothesis_id,
         notes=hyp_in.notes,
-        scope_claims=_resolve_claims(hyp_in.scope_claim_ids, db),
-        supporting_claims=_resolve_claims(hyp_in.supporting_claim_ids, db),
-        anomalous_claims=_resolve_claims(hyp_in.anomalous_claim_ids, db),
+        supporting_observations=_resolve_observations(hyp_in.supporting_observation_ids, db),
+        anomalous_observations=_resolve_observations(hyp_in.anomalous_observation_ids, db),
         competing_hypotheses=_resolve_hypotheses(hyp_in.competing_hypothesis_ids, db),
     )
     db.add(hyp)
     db.commit()
     db.refresh(hyp)
+    _set_warning_headers(response, hyp)
     return _to_read(hyp)
 
 
@@ -163,36 +167,23 @@ def update_hypothesis(
     hyp = _get_or_404(hypothesis_id, db)
     update_data = hyp_in.model_dump(exclude_unset=True)
 
-    # Pop relationship fields before scalar update
-    scope_ids = update_data.pop("scope_claim_ids", None)
-    supporting_ids = update_data.pop("supporting_claim_ids", None)
-    anomalous_ids = update_data.pop("anomalous_claim_ids", None)
-    assumption_ids = update_data.pop("required_assumption_ids", None)
+    supporting_ids = update_data.pop("supporting_observation_ids", None)
+    anomalous_ids = update_data.pop("anomalous_observation_ids", None)
     competitor_ids = update_data.pop("competing_hypothesis_ids", None)
 
     for field, value in update_data.items():
         setattr(hyp, field, value)
 
-    if scope_ids is not None:
-        hyp.scope_claims = _resolve_claims(scope_ids, db)
     if supporting_ids is not None:
-        hyp.supporting_claims = _resolve_claims(supporting_ids, db)
+        hyp.supporting_observations = _resolve_observations(supporting_ids, db)
     if anomalous_ids is not None:
-        hyp.anomalous_claims = _resolve_claims(anomalous_ids, db)
-    if assumption_ids is not None:
-        hyp.required_assumptions = _resolve_claims(assumption_ids, db)
+        hyp.anomalous_observations = _resolve_observations(anomalous_ids, db)
     if competitor_ids is not None:
         hyp.competing_hypotheses = _resolve_hypotheses(competitor_ids, db)
 
-    # Warn if anomalous_claims ends up empty
-    if len(hyp.anomalous_claims) == 0:
-        response.headers["X-Warning"] = (
-            "Hypothesis now has no anomalous_claims. "
-            "Every hypothesis should declare what it cannot explain."
-        )
-
     db.commit()
     db.refresh(hyp)
+    _set_warning_headers(response, hyp)
     return _to_read(hyp)
 
 

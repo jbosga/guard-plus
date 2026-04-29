@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.synthesis import Concept, ConceptRelationship
-from app.models.corpus import Claim
 from app.models.enums import ConceptType, RelationshipType
 from app.models.user import User
 from app.models.synthesis import (
@@ -24,17 +23,6 @@ def _get_concept_or_404(concept_id: UUID, db: Session) -> Concept:
     if not c:
         raise HTTPException(status_code=404, detail="Concept not found")
     return c
-
-
-def _resolve_claims(claim_ids: list[int], db: Session) -> list[Claim]:
-    if not claim_ids:
-        return []
-    claims = db.query(Claim).filter(Claim.id.in_(claim_ids)).all()
-    found = {c.id for c in claims}
-    missing = set(claim_ids) - found
-    if missing:
-        raise HTTPException(status_code=400, detail=f"Claim IDs not found: {sorted(missing)}")
-    return claims
 
 
 # ── Concepts ──────────────────────────────────────────────────────────────────
@@ -68,13 +56,11 @@ def create_concept(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    claims = _resolve_claims(concept_in.supporting_claim_ids, db)
     concept = Concept(
         label=concept_in.label,
         concept_type=concept_in.concept_type,
         description=concept_in.description,
         epistemic_status=concept_in.epistemic_status,
-        supporting_claims=claims,
     )
     db.add(concept)
     db.commit()
@@ -99,14 +85,8 @@ def update_concept(
     current_user: User = Depends(get_current_user),
 ):
     concept = _get_concept_or_404(concept_id, db)
-    update_data = concept_in.model_dump(exclude_unset=True)
-    claim_ids = update_data.pop("supporting_claim_ids", None)
-
-    for field, value in update_data.items():
+    for field, value in concept_in.model_dump(exclude_unset=True).items():
         setattr(concept, field, value)
-    if claim_ids is not None:
-        concept.supporting_claims = _resolve_claims(claim_ids, db)
-
     db.commit()
     db.refresh(concept)
     return ConceptRead.model_validate(concept)
@@ -122,7 +102,7 @@ def delete_concept(
     db.commit()
 
 
-# ── Concept relationships ─────────────────────────────────────────────────────
+# ── Concept relationships (must be declared before /{concept_id} to avoid shadowing) ──
 
 @router.get("/relationships/", response_model=Page[ConceptRelationshipRead])
 def list_relationships(
@@ -165,18 +145,15 @@ def create_relationship(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Verify both concepts exist
     _get_concept_or_404(rel_in.source_concept_id, db)
     _get_concept_or_404(rel_in.target_concept_id, db)
 
-    claims = _resolve_claims(rel_in.supporting_claim_ids, db)
     rel = ConceptRelationship(
         source_concept_id=rel_in.source_concept_id,
         target_concept_id=rel_in.target_concept_id,
         relationship_type=rel_in.relationship_type,
         strength=rel_in.strength,
         notes=rel_in.notes,
-        supporting_claims=claims,
     )
     db.add(rel)
     db.commit()
@@ -195,12 +172,8 @@ def update_relationship(
     if not rel:
         raise HTTPException(status_code=404, detail="Relationship not found")
 
-    update_data = rel_in.model_dump(exclude_unset=True)
-    claim_ids = update_data.pop("supporting_claim_ids", None)
-    for field, value in update_data.items():
+    for field, value in rel_in.model_dump(exclude_unset=True).items():
         setattr(rel, field, value)
-    if claim_ids is not None:
-        rel.supporting_claims = _resolve_claims(claim_ids, db)
 
     db.commit()
     db.refresh(rel)
