@@ -1,13 +1,17 @@
 import { useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getHypothesis, updateHypothesis, deleteHypothesis, getClaims,
+  getHypothesis, updateHypothesis, deleteHypothesis, getObservations,
 } from '../api';
-import type { ClaimRead, HypothesisFramework, HypothesisStatus } from '../types';
+import type {
+  ObservationRead, HypothesisFramework, HypothesisStatus,
+  HypothesisType, ConfidenceLevel,
+} from '../types';
 import {
   Page, Spinner, ErrorState, EmptyState,
-  Badge, EpistemicBadge, ClaimTypeBadge, HypothesisStatusBadge,
+  Badge, ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
+  HypothesisStatusBadge, HypothesisTypeBadge, ConfidenceBadge,
   Button, Card, SectionHeader, Select, Input,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
@@ -26,10 +30,26 @@ const FRAMEWORK_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'active',      label: 'Active' },
+  { value: 'active',    label: 'Active' },
+  { value: 'dormant',   label: 'Dormant' },
+  { value: 'abandoned', label: 'Abandoned' },
+  { value: 'merged',    label: 'Merged' },
+  { value: 'refuted',   label: 'Refuted' },
+];
+
+const TYPE_OPTIONS = [
+  { value: 'causal',         label: 'Causal' },
+  { value: 'correlational',  label: 'Correlational' },
+  { value: 'mechanistic',    label: 'Mechanistic' },
+  { value: 'taxonomic',      label: 'Taxonomic' },
+  { value: 'predictive',     label: 'Predictive' },
+];
+
+const CONFIDENCE_OPTIONS = [
   { value: 'speculative', label: 'Speculative' },
-  { value: 'abandoned',   label: 'Abandoned' },
-  { value: 'merged',      label: 'Merged' },
+  { value: 'plausible',   label: 'Plausible' },
+  { value: 'supported',   label: 'Supported' },
+  { value: 'contested',   label: 'Contested' },
 ];
 
 const ONTOLOGY_OPTIONS = [
@@ -47,14 +67,14 @@ const FRAMEWORK_COLORS: Record<string, string> = {
   unknown:              'var(--text-dim)',
 };
 
-type ClaimSlot =  'supporting_claims' | 'anomalous_claims';
+type ObsSlot = 'supporting_observations' | 'anomalous_observations';
 
-// ── Claim row ─────────────────────────────────────────────────────────────────
+// ── Observation row ───────────────────────────────────────────────────────────
 
-function ClaimRow({
-  claim, onRemove, anomalous = false,
+function ObsRow({
+  obs, onRemove, anomalous = false,
 }: {
-  claim: ClaimRead;
+  obs: ObservationRead;
   onRemove: (id: string) => void;
   anomalous?: boolean;
 }) {
@@ -71,25 +91,26 @@ function ClaimRow({
           fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5,
           marginBottom: 6,
         }}>
-          {claim.claim_text}
+          {obs.content}
         </p>
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
-          <EpistemicBadge status={claim.epistemic_status} />
-          <ClaimTypeBadge type={claim.claim_type} />
-          {claim.source_title && (
+          <ObservationEpistemicBadge status={obs.epistemic_status} />
+          <ContentTypeBadge type={obs.content_type} />
+          <CollectionMethodBadge method={obs.collection_method} />
+          {obs.source_title && (
             <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-              {claim.source_title}
+              {obs.source_title}
             </span>
           )}
-          {claim.page_ref && (
+          {obs.page_ref && (
             <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-              p. {claim.page_ref}
+              p. {obs.page_ref}
             </span>
           )}
         </div>
       </div>
       <button
-        onClick={() => onRemove(claim.id)}
+        onClick={() => onRemove(obs.id)}
         title="Remove from this hypothesis"
         style={{
           background: 'none', border: 'none',
@@ -103,14 +124,13 @@ function ClaimRow({
   );
 }
 
-// ── Claim search / add panel ───────────────────────────────────────────────────
+// ── Observation search / add panel ────────────────────────────────────────────
 
-function ClaimAdder({
-  slot, currentIds, onAdd,
+function ObservationAdder({
+  currentIds, onAdd,
 }: {
-  slot: ClaimSlot;
   currentIds: Set<string>;
-  onAdd: (claim: ClaimRead) => void;
+  onAdd: (obs: ObservationRead) => void;
 }) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -122,11 +142,11 @@ function ClaimAdder({
   }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['claims-search', debouncedQuery],
-    queryFn: () => getClaims({ search: debouncedQuery || undefined, page_size: 50 }),
+    queryKey: ['observations-search', debouncedQuery],
+    queryFn: () => getObservations({ search: debouncedQuery || undefined, page_size: 50 }),
   });
 
-  const results = (data?.items ?? []).filter(c => !currentIds.has(c.id));
+  const results = (data?.items ?? []).filter(o => !currentIds.has(o.id));
 
   return (
     <div style={{ marginTop: 'var(--space-3)' }}>
@@ -134,7 +154,7 @@ function ClaimAdder({
         label=""
         value={query}
         onChange={e => handleChange(e.target.value)}
-        placeholder="Search claims to add…"
+        placeholder="Search observations to add…"
       />
       <div style={{
         marginTop: 6,
@@ -151,13 +171,13 @@ function ClaimAdder({
         )}
         {!isLoading && results.length === 0 && (
           <div style={{ padding: 'var(--space-3)', fontSize: 12, color: 'var(--text-dim)' }}>
-            No unlinked claims{debouncedQuery ? ' match.' : ' available.'}
+            No unlinked observations{debouncedQuery ? ' match.' : ' available.'}
           </div>
         )}
-        {results.map(c => (
+        {results.map(o => (
           <button
-            key={c.id}
-            onClick={() => { onAdd(c); setQuery(''); setDebouncedQuery(''); }}
+            key={o.id}
+            onClick={() => { onAdd(o); setQuery(''); setDebouncedQuery(''); }}
             style={{
               display: 'block', width: '100%', textAlign: 'left',
               background: 'none', border: 'none', borderBottom: '1px solid var(--border-dim)',
@@ -166,13 +186,14 @@ function ClaimAdder({
               fontSize: 12, lineHeight: 1.5,
             }}
           >
-            <div style={{ marginBottom: 4 }}>{c.claim_text}</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <EpistemicBadge status={c.epistemic_status} />
-              <ClaimTypeBadge type={c.claim_type} />
-              {c.source_title && (
+            <div style={{ marginBottom: 4 }}>{o.content}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <ObservationEpistemicBadge status={o.epistemic_status} />
+              <ContentTypeBadge type={o.content_type} />
+              <CollectionMethodBadge method={o.collection_method} />
+              {o.source_title && (
                 <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                  {c.source_title}
+                  {o.source_title}
                 </span>
               )}
             </div>
@@ -190,18 +211,19 @@ export function HypothesisDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  // Local editable copies of claim arrays (managed client-side, flushed on save)
-  // const [scopeClaims,      setScopeClaims]      = useState<ClaimRead[] | null>(null);
-  const [supportingClaims, setSupportingClaims] = useState<ClaimRead[] | null>(null);
-  const [anomalousClaims,  setAnomalousClaims]  = useState<ClaimRead[] | null>(null);
+  const [supportingObs, setSupportingObs] = useState<ObservationRead[] | null>(null);
+  const [anomalousObs, setAnomalousObs]   = useState<ObservationRead[] | null>(null);
 
-  // Scalar field editing
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<{
     label: string;
     description: string;
+    hypothesis_type: HypothesisType;
+    falsification_condition: string;
+    scope: string;
     framework: HypothesisFramework;
     status: HypothesisStatus;
+    confidence_level: ConfidenceLevel;
     notes: string;
     assumed_ontologies: string[];
   } | null>(null);
@@ -213,11 +235,9 @@ export function HypothesisDetail() {
     queryKey: ['hypothesis', id],
     queryFn: () => getHypothesis(id!),
     enabled: !!id,
-    // Seed local state on first load
     select: (data) => {
-      // if (scopeClaims === null)      setScopeClaims(data.scope_claims);
-      if (supportingClaims === null) setSupportingClaims(data.supporting_claims);
-      if (anomalousClaims === null)  setAnomalousClaims(data.anomalous_claims);
+      if (supportingObs === null) setSupportingObs(data.supporting_observations);
+      if (anomalousObs === null)  setAnomalousObs(data.anomalous_observations);
       return data;
     },
   });
@@ -242,39 +262,28 @@ export function HypothesisDetail() {
     },
   });
 
-  // ── Claim-slot helpers ───────────────────────────────────────────────────────
+  // ── Observation slot helpers ─────────────────────────────────────────────────
 
-  function addClaim(slot: ClaimSlot, claim: ClaimRead) {
-    const setter = {
-      // scope_claims:      setScopeClaims,
-      supporting_claims: setSupportingClaims,
-      anomalous_claims:  setAnomalousClaims,
-    }[slot];
-    setter(prev => (prev ? [...prev, claim] : [claim]));
+  function addObs(slot: ObsSlot, obs: ObservationRead) {
+    const setter = { supporting_observations: setSupportingObs, anomalous_observations: setAnomalousObs }[slot];
+    setter(prev => (prev ? [...prev, obs] : [obs]));
   }
 
-  function removeClaim(slot: ClaimSlot, claimId: string) {
-    const setter = {
-      // scope_claims:      setScopeClaims,
-      supporting_claims: setSupportingClaims,
-      anomalous_claims:  setAnomalousClaims,
-    }[slot];
-    setter(prev => (prev ? prev.filter(c => c.id !== claimId) : []));
+  function removeObs(slot: ObsSlot, obsId: string) {
+    const setter = { supporting_observations: setSupportingObs, anomalous_observations: setAnomalousObs }[slot];
+    setter(prev => (prev ? prev.filter(o => o.id !== obsId) : []));
   }
 
-  function saveClaimLinks() {
+  function saveObsLinks() {
     updateMutation.mutate({
-      // scope_claim_ids:      (scopeClaims      ?? []).map(c => c.id),
-      supporting_claim_ids: (supportingClaims ?? []).map(c => c.id),
-      anomalous_claim_ids:  (anomalousClaims  ?? []).map(c => c.id),
+      supporting_observation_ids: (supportingObs ?? []).map(o => o.id),
+      anomalous_observation_ids:  (anomalousObs  ?? []).map(o => o.id),
     });
   }
 
-  // Detect unsaved changes
-  const claimsChanged = hyp && (
-    // JSON.stringify((scopeClaims      ?? []).map(c => c.id)) !== JSON.stringify(hyp.scope_claims.map(c => c.id))      ||
-    JSON.stringify((supportingClaims ?? []).map(c => c.id)) !== JSON.stringify(hyp.supporting_claims.map(c => c.id)) ||
-    JSON.stringify((anomalousClaims  ?? []).map(c => c.id)) !== JSON.stringify(hyp.anomalous_claims.map(c => c.id))
+  const obsChanged = hyp && (
+    JSON.stringify((supportingObs ?? []).map(o => o.id)) !== JSON.stringify(hyp.supporting_observations.map(o => o.id)) ||
+    JSON.stringify((anomalousObs  ?? []).map(o => o.id)) !== JSON.stringify(hyp.anomalous_observations.map(o => o.id))
   );
 
   // ── Scalar edit helpers ──────────────────────────────────────────────────────
@@ -282,12 +291,16 @@ export function HypothesisDetail() {
   function startEdit() {
     if (!hyp) return;
     setEditForm({
-      label:              hyp.label,
-      description:        hyp.description ?? '',
-      framework:          hyp.framework,
-      status:             hyp.status,
-      notes:              hyp.notes ?? '',
-      assumed_ontologies: hyp.assumed_ontologies ?? [],
+      label:                   hyp.label,
+      description:             hyp.description ?? '',
+      hypothesis_type:         hyp.hypothesis_type,
+      falsification_condition: hyp.falsification_condition ?? '',
+      scope:                   hyp.scope ?? '',
+      framework:               hyp.framework,
+      status:                  hyp.status,
+      confidence_level:        hyp.confidence_level,
+      notes:                   hyp.notes ?? '',
+      assumed_ontologies:      hyp.assumed_ontologies ?? [],
     });
     setEditing(true);
   }
@@ -305,25 +318,27 @@ export function HypothesisDetail() {
   function saveScalars() {
     if (!editForm) return;
     updateMutation.mutate({
-      label:              editForm.label.trim(),
-      description:        editForm.description.trim() || undefined,
-      framework:          editForm.framework,
-      status:             editForm.status,
-      notes:              editForm.notes.trim() || undefined,
-      assumed_ontologies: editForm.assumed_ontologies.length
-        ? editForm.assumed_ontologies
-        : undefined,
+      label:                   editForm.label.trim(),
+      description:             editForm.description.trim() || undefined,
+      hypothesis_type:         editForm.hypothesis_type,
+      falsification_condition: editForm.falsification_condition.trim() || undefined,
+      scope:                   editForm.scope.trim() || undefined,
+      framework:               editForm.framework,
+      status:                  editForm.status,
+      confidence_level:        editForm.confidence_level,
+      notes:                   editForm.notes.trim() || undefined,
+      assumed_ontologies:      editForm.assumed_ontologies.length ? editForm.assumed_ontologies : undefined,
     });
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────────
 
-  const anomalousEmpty = (anomalousClaims ?? []).length === 0;
+  const anomalousEmpty = (anomalousObs ?? []).length === 0;
+  const falsificationEmpty = hyp && !hyp.falsification_condition;
 
   const allLinkedIds = new Set([
-    // ...(scopeClaims      ?? []).map(c => c.id),
-    ...(supportingClaims ?? []).map(c => c.id),
-    ...(anomalousClaims  ?? []).map(c => c.id),
+    ...(supportingObs ?? []).map(o => o.id),
+    ...(anomalousObs  ?? []).map(o => o.id),
   ]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -335,16 +350,11 @@ export function HypothesisDetail() {
     <Shell>
       <Page
         title={editing && editForm ? editForm.label || '(untitled)' : hyp.label}
-        subtitle={`${hyp.framework.replace(/_/g, ' ')} · ${hyp.status}`}
+        subtitle={`${hyp.framework.replace(/_/g, ' ')} · ${hyp.hypothesis_type} · ${hyp.status}`}
         actions={
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-            {claimsChanged && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={saveClaimLinks}
-                disabled={updateMutation.isPending}
-              >
+            {obsChanged && (
+              <Button variant="primary" size="sm" onClick={saveObsLinks} disabled={updateMutation.isPending}>
                 {updateMutation.isPending ? 'saving…' : 'save changes'}
               </Button>
             )}
@@ -360,9 +370,7 @@ export function HypothesisDetail() {
             {!deleteConfirm
               ? <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm(true)}>delete</Button>
               : <>
-                  <span style={{ fontSize: 12, color: 'var(--status-error)', fontFamily: 'var(--font-mono)' }}>
-                    delete?
-                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--status-error)', fontFamily: 'var(--font-mono)' }}>delete?</span>
                   <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm(false)}>no</Button>
                   <Button
                     size="sm"
@@ -399,34 +407,52 @@ export function HypothesisDetail() {
               />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                 <Select
+                  label="Hypothesis type"
+                  options={TYPE_OPTIONS}
+                  value={editForm.hypothesis_type}
+                  onChange={e => setEditForm(f => f ? { ...f, hypothesis_type: e.target.value as HypothesisType } : f)}
+                />
+                <Select
                   label="Framework"
                   options={FRAMEWORK_OPTIONS}
                   value={editForm.framework}
                   onChange={e => setEditForm(f => f ? { ...f, framework: e.target.value as HypothesisFramework } : f)}
                 />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                 <Select
                   label="Status"
                   options={STATUS_OPTIONS}
                   value={editForm.status}
                   onChange={e => setEditForm(f => f ? { ...f, status: e.target.value as HypothesisStatus } : f)}
                 />
-              </div>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{
-                  fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-                  color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
-                }}>Description</span>
-                <textarea
-                  value={editForm.description}
-                  onChange={e => setEditForm(f => f ? { ...f, description: e.target.value } : f)}
-                  rows={3}
-                  style={{
-                    background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
-                    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
-                    padding: '6px 10px', fontSize: 13, outline: 'none', resize: 'vertical',
-                  }}
+                <Select
+                  label="Confidence"
+                  options={CONFIDENCE_OPTIONS}
+                  value={editForm.confidence_level}
+                  onChange={e => setEditForm(f => f ? { ...f, confidence_level: e.target.value as ConfidenceLevel } : f)}
                 />
-              </label>
+              </div>
+              <Textarea
+                label="Description"
+                value={editForm.description}
+                onChange={e => setEditForm(f => f ? { ...f, description: e.target.value } : f)}
+                rows={3}
+              />
+              <Textarea
+                label="Falsification condition"
+                value={editForm.falsification_condition}
+                onChange={e => setEditForm(f => f ? { ...f, falsification_condition: e.target.value } : f)}
+                rows={2}
+                placeholder="What evidence would falsify this hypothesis?"
+              />
+              <Textarea
+                label="Scope (free text)"
+                value={editForm.scope}
+                onChange={e => setEditForm(f => f ? { ...f, scope: e.target.value } : f)}
+                rows={2}
+                placeholder="What phenomena does this hypothesis purport to explain?"
+              />
               <div>
                 <span style={{
                   fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
@@ -454,22 +480,12 @@ export function HypothesisDetail() {
                   })}
                 </div>
               </div>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{
-                  fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-                  color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
-                }}>Notes</span>
-                <textarea
-                  value={editForm.notes}
-                  onChange={e => setEditForm(f => f ? { ...f, notes: e.target.value } : f)}
-                  rows={2}
-                  style={{
-                    background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
-                    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
-                    padding: '6px 10px', fontSize: 13, outline: 'none', resize: 'vertical',
-                  }}
-                />
-              </label>
+              <Textarea
+                label="Notes"
+                value={editForm.notes}
+                onChange={e => setEditForm(f => f ? { ...f, notes: e.target.value } : f)}
+                rows={2}
+              />
             </div>
           ) : (
             <>
@@ -478,7 +494,9 @@ export function HypothesisDetail() {
                   label={hyp.framework.replace(/_/g, ' ')}
                   color={FRAMEWORK_COLORS[hyp.framework]}
                 />
+                <HypothesisTypeBadge type={hyp.hypothesis_type} />
                 <HypothesisStatusBadge status={hyp.status} />
+                <ConfidenceBadge level={hyp.confidence_level} />
                 {(hyp.assumed_ontologies ?? []).map(o => (
                   <Badge key={o} label={o} color="var(--text-dim)" />
                 ))}
@@ -493,33 +511,112 @@ export function HypothesisDetail() {
                 </p>
               )}
 
+              {/* Falsification condition — warn if absent */}
+              {falsificationEmpty ? (
+                <div style={{
+                  marginBottom: 'var(--space-3)',
+                  padding: 'var(--space-2) var(--space-3)',
+                  border: '1px solid var(--status-warn)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--status-warn-bg)',
+                  fontFamily: 'var(--font-mono)', fontSize: 11,
+                  color: 'var(--status-warn)',
+                }}>
+                  ⚠ No falsification condition stated. A hypothesis without one is unfalsifiable by construction.
+                </div>
+              ) : (
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <span style={{
+                    fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase',
+                    letterSpacing: '0.06em', fontFamily: 'var(--font-mono)', display: 'block',
+                    marginBottom: 4,
+                  }}>
+                    Falsification condition
+                  </span>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    {hyp.falsification_condition}
+                  </p>
+                </div>
+              )}
+
+              {hyp.scope && (
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <span style={{
+                    fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase',
+                    letterSpacing: '0.06em', fontFamily: 'var(--font-mono)', display: 'block',
+                    marginBottom: 4,
+                  }}>
+                    Scope
+                  </span>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    {hyp.scope}
+                  </p>
+                </div>
+              )}
+
               {hyp.notes && (
                 <p style={{
                   fontSize: 12, color: 'var(--text-dim)',
                   fontFamily: 'var(--font-mono)', lineHeight: 1.5,
+                  marginBottom: 'var(--space-3)',
                 }}>
                   {hyp.notes}
                 </p>
               )}
 
+              {/* Parent hypothesis */}
+              {hyp.parent_hypothesis_id && (
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <span style={{
+                    fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase',
+                    letterSpacing: '0.06em', fontFamily: 'var(--font-mono)', display: 'block',
+                    marginBottom: 4,
+                  }}>
+                    Parent hypothesis
+                  </span>
+                  <Link
+                    to={`/hypotheses/${hyp.parent_hypothesis_id}`}
+                    style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}
+                  >
+                    → {hyp.parent_hypothesis_id.slice(0, 8)}…
+                  </Link>
+                </div>
+              )}
+
+              {/* Competing hypotheses */}
+              {hyp.competing_hypotheses && hyp.competing_hypotheses.length > 0 && (
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <span style={{
+                    fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase',
+                    letterSpacing: '0.06em', fontFamily: 'var(--font-mono)', display: 'block',
+                    marginBottom: 4,
+                  }}>
+                    Competing hypotheses
+                  </span>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    {hyp.competing_hypotheses.map(c => (
+                      <Link
+                        key={c.id}
+                        to={`/hypotheses/${c.id}`}
+                        style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}
+                      >
+                        {c.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{
-                display: 'flex', gap: 'var(--space-5)', marginTop: 'var(--space-3)',
+                display: 'flex', gap: 'var(--space-5)',
                 paddingTop: 'var(--space-3)', borderTop: '1px solid var(--border-dim)',
               }}>
-                {/* <div>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-mono)' }}>
-                    Scope
-                  </span>
-                  <div style={{ fontSize: 20, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                    {(scopeClaims ?? hyp.scope_claims).length}
-                  </div>
-                </div> */}
                 <div>
                   <span style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-mono)' }}>
                     Supporting
                   </span>
-                  <div style={{ fontSize: 20, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--status-success)' }}>
-                    {(supportingClaims ?? hyp.supporting_claims).length}
+                  <div style={{ fontSize: 20, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--status-ok)' }}>
+                    {(supportingObs ?? hyp.supporting_observations).length}
                   </div>
                 </div>
                 <div>
@@ -527,7 +624,7 @@ export function HypothesisDetail() {
                     Anomalous
                   </span>
                   <div style={{ fontSize: 20, fontWeight: 600, fontFamily: 'var(--font-mono)', color: anomalousEmpty ? 'var(--status-error)' : 'var(--text-primary)' }}>
-                    {(anomalousClaims ?? hyp.anomalous_claims).length}
+                    {(anomalousObs ?? hyp.anomalous_observations).length}
                   </div>
                 </div>
               </div>
@@ -535,42 +632,30 @@ export function HypothesisDetail() {
           )}
         </Card>
 
-    
+        {/* ── Observation sections ── */}
 
-        {/* ── Claim sections ── */}
-
-        {/* <ClaimSection
-          title="Scope"
-          subtitle="What this hypothesis purports to explain"
-          claims={scopeClaims ?? []}
-          slot="scope_claims"
+        <ObsSection
+          title="Supporting observations"
+          subtitle="Observations that support this hypothesis"
+          obs={supportingObs ?? []}
+          slot="supporting_observations"
           allLinkedIds={allLinkedIds}
-          onAdd={(c) => addClaim('scope_claims', c)}
-          onRemove={(id) => removeClaim('scope_claims', id)}
-        /> */}
-
-        <ClaimSection
-          title="Supporting evidence"
-          subtitle="Claims that support this hypothesis"
-          claims={supportingClaims ?? []}
-          slot="supporting_claims"
-          allLinkedIds={allLinkedIds}
-          onAdd={(c) => addClaim('supporting_claims', c)}
-          onRemove={(id) => removeClaim('supporting_claims', id)}
+          onAdd={(o) => addObs('supporting_observations', o)}
+          onRemove={(oid) => removeObs('supporting_observations', oid)}
         />
 
-        <ClaimSection
-          title="Anomalous claims"
-          subtitle="Evidence this hypothesis cannot explain"
-          claims={anomalousClaims ?? []}
-          slot="anomalous_claims"
+        <ObsSection
+          title="Anomalous observations"
+          subtitle="Observations this hypothesis cannot explain"
+          obs={anomalousObs ?? []}
+          slot="anomalous_observations"
           allLinkedIds={allLinkedIds}
           anomalous
-          onAdd={(c) => addClaim('anomalous_claims', c)}
-          onRemove={(id) => removeClaim('anomalous_claims', id)}
+          onAdd={(o) => addObs('anomalous_observations', o)}
+          onRemove={(oid) => removeObs('anomalous_observations', oid)}
         />
 
-        {claimsChanged && (
+        {obsChanged && (
           <div style={{
             marginTop: 'var(--space-5)',
             padding: 'var(--space-3) var(--space-4)',
@@ -580,14 +665,9 @@ export function HypothesisDetail() {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
             <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-              Unsaved claim changes
+              Unsaved observation changes
             </span>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={saveClaimLinks}
-              disabled={updateMutation.isPending}
-            >
+            <Button variant="primary" size="sm" onClick={saveObsLinks} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? 'saving…' : 'save changes'}
             </Button>
           </div>
@@ -597,18 +677,18 @@ export function HypothesisDetail() {
   );
 }
 
-// ── Claim section component ───────────────────────────────────────────────────
+// ── Observation section component ─────────────────────────────────────────────
 
-function ClaimSection({
-  title, subtitle, claims, slot, allLinkedIds, anomalous = false, onAdd, onRemove,
+function ObsSection({
+  title, subtitle, obs, allLinkedIds, anomalous = false, onAdd, onRemove,
 }: {
   title: string;
   subtitle: string;
-  claims: ClaimRead[];
-  slot: ClaimSlot;
+  obs: ObservationRead[];
+  slot: ObsSlot;
   allLinkedIds: Set<string>;
   anomalous?: boolean;
-  onAdd: (c: ClaimRead) => void;
+  onAdd: (o: ObservationRead) => void;
   onRemove: (id: string) => void;
 }) {
   const [showAdder, setShowAdder] = useState(false);
@@ -620,7 +700,6 @@ function ClaimSection({
       borderRadius: 'var(--radius-md)',
       overflow: 'hidden',
     }}>
-      {/* Section header */}
       <div style={{
         padding: 'var(--space-3) var(--space-4)',
         background: anomalous ? 'rgba(255,43,43,0.06)' : 'var(--bg-0)',
@@ -641,46 +720,67 @@ function ClaimSection({
           </span>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-          <span style={{
-            fontSize: 11, color: 'var(--text-dim)',
-            fontFamily: 'var(--font-mono)', marginRight: 4,
-          }}>
-            {claims.length}
+          <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginRight: 4 }}>
+            {obs.length}
           </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowAdder(v => !v)}
-          >
+          <Button size="sm" variant="ghost" onClick={() => setShowAdder(v => !v)}>
             {showAdder ? 'done' : '+ add'}
           </Button>
         </div>
       </div>
 
-      {/* Claim list */}
       <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {claims.length === 0 && !showAdder && (
+        {obs.length === 0 && !showAdder && (
           <EmptyState message={anomalous
-            ? 'No anomalous claims — use + add to declare what this hypothesis cannot explain.'
-            : 'No claims linked yet.'
+            ? 'No anomalous observations — use + add to declare what this hypothesis cannot explain.'
+            : 'No observations linked yet.'
           } />
         )}
-        {claims.map(c => (
-          <ClaimRow
-            key={c.id}
-            claim={c}
+        {obs.map(o => (
+          <ObsRow
+            key={o.id}
+            obs={o}
             anomalous={anomalous}
             onRemove={onRemove}
           />
         ))}
         {showAdder && (
-          <ClaimAdder
-            slot={slot}
+          <ObservationAdder
             currentIds={allLinkedIds}
-            onAdd={(c) => { onAdd(c); }}
+            onAdd={(o) => { onAdd(o); }}
           />
         )}
       </div>
     </div>
+  );
+}
+
+// ── Textarea helper ───────────────────────────────────────────────────────────
+
+function Textarea({ label, value, onChange, rows, placeholder }: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  rows?: number;
+  placeholder?: string;
+}) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{
+        fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
+      }}>{label}</span>
+      <textarea
+        value={value}
+        onChange={onChange}
+        rows={rows ?? 3}
+        placeholder={placeholder}
+        style={{
+          background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
+          borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+          padding: '6px 10px', fontSize: 13, outline: 'none', resize: 'vertical',
+        }}
+      />
+    </label>
   );
 }

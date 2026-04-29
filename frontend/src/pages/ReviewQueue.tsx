@@ -1,29 +1,30 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getReviewQueue, reviewClaim } from '../api';
-import type { EpistemicStatus, ClaimType } from '../types';
+import { getReviewQueue, reviewObservation } from '../api';
+import type { ObservationEpistemicStatus, ContentType } from '../types';
 import {
   Page, Spinner, ErrorState, EmptyState,
-  EpistemicBadge, ClaimTypeBadge, Button, Select, Stat, Card,
+  ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
+  Button, Select, Stat, Card,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
 
-const EP_OPTIONS: { value: EpistemicStatus; label: string }[] = [
-  { value: 'asserted', label: 'Asserted' },
-  { value: 'observed', label: 'Observed' },
-  { value: 'inferred', label: 'Inferred' },
-  { value: 'speculative', label: 'Speculative' },
-  { value: 'contested', label: 'Contested' },
-  { value: 'retracted', label: 'Retracted' },
+const EP_OPTIONS: { value: ObservationEpistemicStatus; label: string }[] = [
+  { value: 'reported',     label: 'Reported' },
+  { value: 'corroborated', label: 'Corroborated' },
+  { value: 'contested',    label: 'Contested' },
+  { value: 'artefactual',  label: 'Artefactual' },
+  { value: 'retracted',    label: 'Retracted' },
 ];
 
-const CT_OPTIONS: { value: ClaimType; label: string }[] = [
-  { value: 'phenomenological', label: 'Phenomenological' },
-  { value: 'causal', label: 'Causal' },
-  { value: 'correlational', label: 'Correlational' },
-  { value: 'definitional', label: 'Definitional' },
-  { value: 'methodological', label: 'Methodological' },
+const CT_OPTIONS: { value: ContentType; label: string }[] = [
+  { value: 'experiential',      label: 'Experiential' },
+  { value: 'behavioral',        label: 'Behavioral' },
+  { value: 'physiological',     label: 'Physiological' },
+  { value: 'environmental',     label: 'Environmental' },
+  { value: 'testimonial',       label: 'Testimonial' },
+  { value: 'documentary_trace', label: 'Documentary trace' },
 ];
 
 export function ReviewQueue() {
@@ -38,16 +39,16 @@ export function ReviewQueue() {
   });
 
   const mutation = useMutation({
-    mutationFn: ({ claimId, accepted, edited_text, epistemic_status, claim_type }: {
-      claimId: string;
+    mutationFn: ({ obsId, accepted, edited_content, epistemic_status, content_type }: {
+      obsId: string;
       accepted: boolean;
-      edited_text?: string;
-      epistemic_status?: EpistemicStatus;
-      claim_type?: ClaimType;
-    }) => reviewClaim(claimId, { accepted, edited_text, epistemic_status, claim_type }),
+      edited_content?: string;
+      epistemic_status?: ObservationEpistemicStatus;
+      content_type?: ContentType;
+    }) => reviewObservation(obsId, { accepted, edited_content, epistemic_status, content_type }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['review-queue'] });
-      qc.invalidateQueries({ queryKey: ['claims'] });
+      qc.invalidateQueries({ queryKey: ['observations'] });
     },
   });
 
@@ -58,7 +59,7 @@ export function ReviewQueue() {
     <Shell>
       <Page
         title="Review Queue"
-        subtitle="AI-extracted claims awaiting human review"
+        subtitle="AI-extracted observations awaiting human review"
       >
         {/* Stats bar */}
         <div style={{ display: 'flex', gap: 'var(--space-6)', marginBottom: 'var(--space-5)' }}>
@@ -70,27 +71,27 @@ export function ReviewQueue() {
             fontSize: 12, color: 'var(--text-dim)',
             display: 'flex', alignItems: 'center', maxWidth: 400, lineHeight: 1.6,
           }}>
-            Each claim is reviewed individually. Accept to add to the corpus,
+            Each observation is reviewed individually. Accept to add to the corpus,
             edit to correct the AI output, or reject to discard entirely.
           </div>
         </div>
 
         {data?.total === 0 && (
-          <EmptyState message="queue is empty — all AI claims have been reviewed" />
+          <EmptyState message="queue is empty — all AI observations have been reviewed" />
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          {data?.items.map((claim, i) => (
+          {data?.items.map((obs, i) => (
             <ReviewCard
-              key={claim.id}
-              claim={claim}
+              key={obs.id}
+              obs={obs}
               index={i}
               onAccept={(overrides) => mutation.mutate({
-                claimId: claim.id,
+                obsId: obs.id,
                 accepted: true,
                 ...overrides,
               })}
-              onReject={() => mutation.mutate({ claimId: claim.id, accepted: false })}
+              onReject={() => mutation.mutate({ obsId: obs.id, accepted: false })}
               busy={mutation.isPending}
             />
           ))}
@@ -112,33 +113,36 @@ export function ReviewQueue() {
 // ── Individual review card ────────────────────────────────────────────────────
 
 interface ReviewCardProps {
-  claim: {
+  obs: {
     id: string;
-    claim_text: string;
-    claim_type: ClaimType;
-    epistemic_status: EpistemicStatus;
+    content: string;
+    content_type: ContentType;
+    source_modality: string;
+    epistemic_distance: string;
+    collection_method: string;
+    epistemic_status: ObservationEpistemicStatus;
     page_ref: string | null;
     verbatim: boolean;
     source_id: string;
     source_title?: string;
   };
   index: number;
-  onAccept: (overrides: { edited_text?: string; epistemic_status?: EpistemicStatus; claim_type?: ClaimType }) => void;
+  onAccept: (overrides: { edited_content?: string; epistemic_status?: ObservationEpistemicStatus; content_type?: ContentType }) => void;
   onReject: () => void;
   busy: boolean;
 }
 
-function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps) {
-  const [overrideStatus, setOverrideStatus] = useState<EpistemicStatus | ''>('');
-  const [overrideType, setOverrideType] = useState<ClaimType | ''>('');
+function ReviewCard({ obs, index, onAccept, onReject, busy }: ReviewCardProps) {
+  const [overrideStatus, setOverrideStatus] = useState<ObservationEpistemicStatus | ''>('');
+  const [overrideType, setOverrideType] = useState<ContentType | ''>('');
   const [editingText, setEditingText] = useState(false);
-  const [editedText, setEditedText] = useState(claim.claim_text);
+  const [editedContent, setEditedContent] = useState(obs.content);
 
   function handleAccept() {
     onAccept({
-      ...(editingText && editedText !== claim.claim_text ? { edited_text: editedText } : {}),
+      ...(editingText && editedContent !== obs.content ? { edited_content: editedContent } : {}),
       ...(overrideStatus ? { epistemic_status: overrideStatus } : {}),
-      ...(overrideType ? { claim_type: overrideType } : {}),
+      ...(overrideType ? { content_type: overrideType } : {}),
     });
   }
 
@@ -151,18 +155,35 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
         borderLeft: '3px solid var(--accent)',
       }}
     >
-      {/* Badges */}
+      {/* Classification axes (read-only AI suggestions) */}
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
-        <EpistemicBadge status={overrideStatus || claim.epistemic_status} />
-        <ClaimTypeBadge type={overrideType || claim.claim_type} />
-        {claim.page_ref && (
+        <ObservationEpistemicBadge status={(overrideStatus || obs.epistemic_status) as ObservationEpistemicStatus} />
+        <ContentTypeBadge type={(overrideType || obs.content_type) as ContentType} />
+        <CollectionMethodBadge method={obs.collection_method as import('../types').CollectionMethod} />
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          color: 'var(--text-dim)',
+          border: '1px solid var(--border-dim)',
+          padding: '1px 6px', borderRadius: 20,
+        }}>
+          {obs.source_modality.replace(/_/g, ' ')}
+        </span>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          color: 'var(--text-dim)',
+          border: '1px solid var(--border-dim)',
+          padding: '1px 6px', borderRadius: 20,
+        }}>
+          {obs.epistemic_distance}
+        </span>
+        {obs.page_ref && (
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
-            p.{claim.page_ref}
+            p.{obs.page_ref}
           </span>
         )}
-        {claim.source_title && (
+        {obs.source_title && (
           <Link
-            to={`/sources/${claim.source_id}`}
+            to={`/sources/${obs.source_id}`}
             style={{
               marginLeft: 'auto',
               fontFamily: 'var(--font-mono)', fontSize: 10,
@@ -173,24 +194,24 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
-            title={claim.source_title}
+            title={obs.source_title}
           >
-            ↗ {claim.source_title}
+            ↗ {obs.source_title}
           </Link>
         )}
       </div>
 
-      {/* Text / edit area */}
+      {/* Content / edit area */}
       {editingText ? (
         <textarea
-          value={editedText}
-          onChange={e => setEditedText(e.target.value)}
+          value={editedContent}
+          onChange={e => setEditedContent(e.target.value)}
           rows={4}
           style={{
             width: '100%', maxWidth: 720, boxSizing: 'border-box',
             background: 'var(--bg-0)', border: '1px solid var(--accent)',
             borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
-            fontFamily: claim.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
+            fontFamily: obs.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
             fontSize: 13, lineHeight: 1.65, padding: '8px 10px',
             outline: 'none', resize: 'vertical',
             marginBottom: 'var(--space-3)',
@@ -200,7 +221,7 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
         <p
           style={{
             fontSize: 13, lineHeight: 1.65,
-            fontFamily: claim.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
+            fontFamily: obs.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
             color: 'var(--text-primary)',
             marginBottom: 'var(--space-4)',
             maxWidth: 720,
@@ -209,7 +230,7 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
           onClick={() => setEditingText(true)}
           title="Click to edit text"
         >
-          {editedText}
+          {editedContent}
         </p>
       )}
 
@@ -217,16 +238,16 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
       <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
         <Select
           options={EP_OPTIONS}
-          placeholder={`keep: ${claim.epistemic_status}`}
+          placeholder={`keep: ${obs.epistemic_status}`}
           value={overrideStatus}
-          onChange={e => setOverrideStatus(e.target.value as EpistemicStatus | '')}
+          onChange={e => setOverrideStatus(e.target.value as ObservationEpistemicStatus | '')}
           style={{ fontSize: 11, padding: '3px 8px' }}
         />
         <Select
           options={CT_OPTIONS}
-          placeholder={`keep: ${claim.claim_type}`}
+          placeholder={`keep: ${obs.content_type}`}
           value={overrideType}
-          onChange={e => setOverrideType(e.target.value as ClaimType | '')}
+          onChange={e => setOverrideType(e.target.value as ContentType | '')}
           style={{ fontSize: 11, padding: '3px 8px' }}
         />
         {!editingText && (
@@ -244,7 +265,7 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
         )}
         {editingText && (
           <button
-            onClick={() => { setEditingText(false); setEditedText(claim.claim_text); }}
+            onClick={() => { setEditingText(false); setEditedContent(obs.content); }}
             style={{
               background: 'none', border: '1px solid var(--border-dim)',
               borderRadius: 'var(--radius-sm)', cursor: 'pointer',
@@ -255,20 +276,10 @@ function ReviewCard({ claim, index, onAccept, onReject, busy }: ReviewCardProps)
             discard edit
           </button>
         )}
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={busy}
-          onClick={handleAccept}
-        >
+        <Button size="sm" variant="primary" disabled={busy} onClick={handleAccept}>
           ✓ accept
         </Button>
-        <Button
-          size="sm"
-          variant="danger"
-          disabled={busy}
-          onClick={onReject}
-        >
+        <Button size="sm" variant="danger" disabled={busy} onClick={onReject}>
           ✗ reject
         </Button>
       </div>

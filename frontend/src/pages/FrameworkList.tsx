@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getHypotheses } from '../api';
-import { AddHypothesisModal } from '../components/AddHypothesisModal';
+import { getFrameworks } from '../api';
+import { AddFrameworkModal } from '../components/AddFrameworkModal';
 import {
   Page, Spinner, ErrorState, EmptyState, Pagination,
-  HypothesisTypeBadge, HypothesisStatusBadge, ConfidenceBadge,
-  Badge, Card, Button,
+  FrameworkStatusBadge, ConfidenceBadge, Badge, Card, Button,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
 
@@ -21,57 +20,55 @@ const FRAMEWORK_COLORS: Record<string, string> = {
   unknown:              'var(--text-dim)',
 };
 
-export function HypothesisList() {
+export function FrameworkList() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['hypotheses', page],
-    queryFn: () => getHypotheses({ page, page_size: 25 }),
+    queryKey: ['frameworks', page],
+    queryFn: () => getFrameworks({ page, page_size: 25 }),
   });
 
   return (
     <Shell>
       <Page
-        title="Hypotheses"
-        subtitle="Explanatory frameworks under active investigation"
+        title="Frameworks"
+        subtitle="Theoretical frameworks grouping related hypotheses"
         actions={
           <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
-            + new hypothesis
+            + new framework
           </Button>
         }
       >
         {isLoading && <Spinner />}
-        {isError && <ErrorState message="Failed to load hypotheses" />}
+        {isError && <ErrorState message="Failed to load frameworks" />}
 
         {data && data.items.length === 0 && (
-          <EmptyState message="no hypotheses yet — add one with the button above" />
+          <EmptyState message="no frameworks yet — add one with the button above" />
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          {data?.items.map((hyp, i) => (
+          {data?.items.map((fw, i) => (
             <Card
-              key={hyp.id}
+              key={fw.id}
               className="fade-in"
               style={{
                 padding: 'var(--space-4)',
                 animationDelay: `${i * 25}ms`,
                 cursor: 'pointer',
               }}
-              onClick={() => navigate(`/hypotheses/${hyp.id}`)}
+              onClick={() => navigate(`/frameworks/${fw.id}`)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-4)' }}>
                 <div style={{ flex: 1 }}>
-                  {/* Header badges */}
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                     <Badge
-                      label={hyp.framework.replace(/_/g, ' ')}
-                      color={FRAMEWORK_COLORS[hyp.framework]}
+                      label={fw.framework_type.replace(/_/g, ' ')}
+                      color={FRAMEWORK_COLORS[fw.framework_type]}
                     />
-                    <HypothesisTypeBadge type={hyp.hypothesis_type} />
-                    <HypothesisStatusBadge status={hyp.status} />
-                    <ConfidenceBadge level={hyp.confidence_level} />
+                    <FrameworkStatusBadge status={fw.status} />
+                    <ConfidenceBadge level={fw.confidence_level} />
                   </div>
 
                   <h3 style={{
@@ -79,12 +76,12 @@ export function HypothesisList() {
                     fontWeight: 500, color: 'var(--text-primary)',
                     marginBottom: 'var(--space-2)',
                   }}>
-                    {hyp.label}
+                    {fw.label}
                   </h3>
 
-                  {hyp.assumed_ontologies && hyp.assumed_ontologies.length > 0 && (
+                  {fw.assumed_ontologies && fw.assumed_ontologies.length > 0 && (
                     <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
-                      {hyp.assumed_ontologies.map(o => (
+                      {fw.assumed_ontologies.map(o => (
                         <span key={o} style={{
                           fontFamily: 'var(--font-mono)', fontSize: 9,
                           color: 'var(--text-dim)', border: '1px solid var(--border-dim)',
@@ -97,28 +94,28 @@ export function HypothesisList() {
                   )}
                 </div>
 
-                {/* Observation counts */}
+                {/* Hypothesis counts */}
                 <div style={{ display: 'flex', gap: 'var(--space-4)', flexShrink: 0 }}>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 500,
                       color: 'var(--status-ok)',
                     }}>
-                      {hyp.supporting_observation_count}
+                      {fw.core_hypothesis_count}
                     </div>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9,
                       color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase',
                     }}>
-                      supporting
+                      core
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 500,
-                      color: hyp.anomalous_observation_count === 0 ? 'var(--status-error)' : 'var(--status-warn)',
+                      color: fw.anomalous_hypothesis_count === 0 ? 'var(--status-error)' : 'var(--status-warn)',
                     }}>
-                      {hyp.anomalous_observation_count}
+                      {fw.anomalous_hypothesis_count}
                     </div>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9,
@@ -130,8 +127,7 @@ export function HypothesisList() {
                 </div>
               </div>
 
-              {/* Anti-confirmation-bias warning */}
-              {hyp.anomalous_observation_count === 0 && (
+              {fw.anomalous_hypothesis_count === 0 && (
                 <div style={{
                   marginTop: 'var(--space-3)',
                   padding: 'var(--space-2) var(--space-3)',
@@ -140,7 +136,7 @@ export function HypothesisList() {
                   fontFamily: 'var(--font-mono)', fontSize: 10,
                   color: 'var(--status-error)', letterSpacing: '0.03em',
                 }}>
-                  ⚠ No anomalous observations declared — every hypothesis must account for what it cannot explain
+                  ⚠ No anomalous hypotheses declared — every framework should state what it cannot explain
                 </div>
               )}
             </Card>
@@ -152,7 +148,7 @@ export function HypothesisList() {
         )}
       </Page>
 
-      {showAdd && <AddHypothesisModal onClose={() => setShowAdd(false)} />}
+      {showAdd && <AddFrameworkModal onClose={() => setShowAdd(false)} />}
     </Shell>
   );
 }

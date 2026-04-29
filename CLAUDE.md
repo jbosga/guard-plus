@@ -171,6 +171,7 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 | **Chat 7** | Knowledge graph view (Cytoscape.js) | ✅ Done |
 | **Chat 8** | Hypothesis workspace (synthesis layer) | ✅ Done |
 | **Phase A** | Backend data model refactor: Claim→Observation, Hypothesis→{Hypothesis,TheoreticalFramework} | ✅ Done |
+| **Phase B** | Frontend refactor: all Claim→Observation, new Hypothesis/Framework types, new badges, FrameworkList/FrameworkDetail pages | ✅ Done |
 
 ---
 
@@ -299,6 +300,28 @@ PhenomenonTag                                    Concept / ConceptRelationship
 - **`src/api/index.ts`** — added `createHypothesis`, `updateHypothesis`, `deleteHypothesis`, `getHypothesis` typed API calls
 - **`src/types/index.ts`** — added `HypothesisRead`, `HypothesisCreate`, `HypothesisUpdate`, `HypothesisStatus`, `HypothesisFramework`, `AssumedOntology` types
 - **`src/App.tsx`** — added `/hypotheses/:id` route → `<HypothesisDetail />`
+
+### Phase B — Frontend refactor
+
+- **`src/types/index.ts`** — replaced `ClaimRead`, `ClaimType`, `EpistemicStatus` (old), `HypothesisList/Read/Create/Update` (old) with full `ObservationRead/Create/Update`, new `HypothesisList/Read/Create/Update`, `TheoreticalFrameworkList/Read/Create/Update`, and all supporting enums (`ObservationEpistemicStatus`, `ContentType`, `SourceModality`, `EpistemicDistance`, `CollectionMethod`, `HypothesisType`, `HypothesisStatus`, `ConfidenceLevel`, `FrameworkStatus`, `CorroborationLevel`)
+- **`src/api/index.ts`** — removed all Claim functions; added `getObservations`, `getSourceObservations`, `getReviewQueue`, `reviewObservation`, `createObservation`, `updateObservation`; rewrote hypothesis functions; added `getFrameworks`, `getFramework`, `createFramework`, `updateFramework`, `deleteFramework`
+- **`src/components/ui.tsx`** — removed `EpistemicBadge`, `ClaimTypeBadge`, old `HypothesisStatusBadge`; added `ObservationEpistemicBadge`, `ContentTypeBadge`, `CollectionMethodBadge`, `HypothesisTypeBadge`, `HypothesisStatusBadge` (new values), `FrameworkStatusBadge`, `ConfidenceBadge`
+- **`src/pages/ObservationList.tsx`** — new page at `/observations`; replaces ClaimList; filter bar covers epistemic_status, content_type, epistemic_distance, collection_method, ai_extracted, unreviewed; inline edit of epistemic_status + content_type
+- **`src/pages/ReviewQueue.tsx`** — rewritten for `ObservationRead`; review card shows all four classification axes as read-only badges with reviewer override of epistemic_status + content_type
+- **`src/pages/HypothesisList.tsx`** — updated to new `HypothesisList` type; shows `HypothesisTypeBadge`, `HypothesisStatusBadge`, `ConfidenceBadge`, supporting/anomalous observation counts
+- **`src/components/HypothesisDetail.tsx`** — major rewrite; `ObservationAdder` replaces `ClaimAdder`; new fields `hypothesis_type`, `falsification_condition`, `scope`, `confidence_level`; amber warning banner when `falsification_condition` is empty; parent/competing hypothesis read-only display
+- **`src/components/AddHypothesisModal.tsx`** — added `hypothesis_type` (required), `falsification_condition`, `confidence_level`; removed `required_assumptions`
+- **`src/pages/FrameworkList.tsx`** — new list page at `/frameworks`; shows `FrameworkStatusBadge`, `ConfidenceBadge`, core/anomalous hypothesis counts; anomalous=0 warning
+- **`src/components/AddFrameworkModal.tsx`** — creation modal with label, framework_type, status, confidence_level, assumed_ontologies, description, notes
+- **`src/pages/FrameworkDetail.tsx`** — detail page at `/frameworks/:id`; inline-editable scalar fields; `HypothesisAdder` for core and anomalous hypothesis slots; amber warning banner if no anomalous hypotheses declared
+- **`src/components/AddObservationModal.tsx`** — replaces AddClaimModal; all four classification axes required; aggregate fields (sample_n, sample_size_tier, sampling_method, inclusion_criteria_documented) shown conditionally when epistemic_distance=aggregated
+- **`src/pages/SourceDetail.tsx`** — updated to use `getSourceObservations`; renders `ObservationRead` rows with new badges; stat label "Observations"; uses `AddObservationModal`
+- **`src/pages/SourceList.tsx`** — updated `claim_count` → `observation_count`
+- **`src/pages/GraphView.tsx`** — removed `supporting_claim_ids` node sizing (concept observation anchoring is a planned follow-on phase); nodes now equal size
+- **`src/components/Shell.tsx`** — nav updated: `/observations` (🔭), `/frameworks` (🧩) added; `/claims` removed
+- **`src/App.tsx`** — routes updated: `/observations` → `ObservationList`; `/frameworks` → `FrameworkList`; `/frameworks/:id` → `FrameworkDetail`
+
+**Note on `import_excel.py`:** Still references old Claim schema. Needs a refactor pass to map legacy Excel columns to the Observation model before re-import can happen.
 
 ---
 

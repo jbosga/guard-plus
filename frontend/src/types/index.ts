@@ -15,12 +15,6 @@ export type ProvenanceQuality =
 export type IngestionStatus = 'pending' | 'processing' | 'complete' | 'failed';
 export type IngestionMethod = 'ai' | 'manual' | 'bulk_import';
 
-export type EpistemicStatus =
-  | 'asserted' | 'observed' | 'inferred' | 'speculative' | 'contested' | 'retracted';
-
-export type ClaimType =
-  | 'phenomenological' | 'causal' | 'correlational' | 'definitional' | 'methodological';
-
 export type TagCategory =
   | 'perceptual' | 'somatic' | 'cognitive' | 'narrative' | 'environmental' | 'emotional';
 
@@ -35,7 +29,50 @@ export type HypothesisFramework =
   | 'neurological' | 'psychological' | 'sociocultural' | 'physical'
   | 'interdimensional' | 'information_theoretic' | 'psychospiritual' | 'unknown';
 
-export type HypothesisStatus = 'active' | 'abandoned' | 'merged' | 'speculative';
+export type CorroborationLevel =
+  | 'none' | 'witness' | 'physical_trace' | 'investigator' | 'multiple';
+
+// ── Observation enums ─────────────────────────────────────────────────────────
+
+export type ObservationEpistemicStatus =
+  | 'reported' | 'corroborated' | 'contested' | 'artefactual' | 'retracted';
+
+export type ContentType =
+  | 'experiential' | 'behavioral' | 'physiological'
+  | 'environmental' | 'testimonial' | 'documentary_trace';
+
+export type SourceModality =
+  | 'first_person_verbal' | 'investigator_summary' | 'physiological'
+  | 'behavioral' | 'documentary' | 'aggregate_statistical';
+
+export type EpistemicDistance =
+  | 'direct' | 'summarized' | 'aggregated' | 'derived';
+
+export type CollectionMethod =
+  | 'spontaneous_report' | 'structured_interview' | 'hypnotic_regression'
+  | 'questionnaire' | 'clinical_assessment' | 'passive_recording'
+  | 'investigator_inference';
+
+export type SampleSizeTier =
+  | 'single_case' | 'small' | 'moderate' | 'large' | 'population';
+
+export type SamplingMethod =
+  | 'self_selected' | 'investigator_referred' | 'clinical'
+  | 'survey' | 'convenience' | 'unknown';
+
+// ── Hypothesis enums ──────────────────────────────────────────────────────────
+
+export type HypothesisType =
+  | 'causal' | 'correlational' | 'mechanistic' | 'taxonomic' | 'predictive';
+
+export type HypothesisStatus =
+  | 'active' | 'dormant' | 'abandoned' | 'merged' | 'refuted';
+
+export type ConfidenceLevel =
+  | 'speculative' | 'plausible' | 'supported' | 'contested';
+
+export type FrameworkStatus =
+  | 'active' | 'dormant' | 'abandoned' | 'merged' | 'refuted';
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 
@@ -75,7 +112,7 @@ export interface SourceList {
   provenance_quality: ProvenanceQuality;
   ingestion_date: string | null;
   ingestion_status: IngestionStatus | null;
-  claim_count: number;
+  observation_count: number;
 }
 
 export interface SourceRead extends SourceList {
@@ -132,18 +169,25 @@ export interface PhenomenonTagRead {
   parent_tag_id: string | null;
 }
 
-// ── Claims ────────────────────────────────────────────────────────────────────
+// ── Observations ──────────────────────────────────────────────────────────────
 
-export interface ClaimRead {
+export interface ObservationRead {
   id: string;
   source_id: string;
   source_title?: string;
-  claim_text: string;
+  content: string;
+  content_type: ContentType;
+  source_modality: SourceModality;
+  epistemic_distance: EpistemicDistance;
+  collection_method: CollectionMethod;
+  epistemic_status: ObservationEpistemicStatus;
+  corroboration_level: CorroborationLevel;
+  sample_n: number | null;
+  sample_size_tier: SampleSizeTier | null;
+  sampling_method: SamplingMethod | null;
+  inclusion_criteria_documented: boolean | null;
   verbatim: boolean;
   page_ref: string | null;
-  timestamp_ref: string | null;
-  epistemic_status: EpistemicStatus;
-  claim_type: ClaimType;
   ai_extracted: boolean;
   ingestion_method: IngestionMethod | null;
   reviewed_by: string | null;
@@ -153,72 +197,154 @@ export interface ClaimRead {
   updated_at: string;
 }
 
+export interface ObservationCreate {
+  source_id: string;
+  content: string;
+  content_type: ContentType;
+  source_modality: SourceModality;
+  epistemic_distance: EpistemicDistance;
+  collection_method: CollectionMethod;
+  epistemic_status?: ObservationEpistemicStatus;
+  corroboration_level?: CorroborationLevel;
+  sample_n?: number;
+  sample_size_tier?: SampleSizeTier;
+  sampling_method?: SamplingMethod;
+  inclusion_criteria_documented?: boolean;
+  verbatim?: boolean;
+  page_ref?: string;
+}
+
+export interface ObservationUpdate {
+  content?: string;
+  content_type?: ContentType;
+  source_modality?: SourceModality;
+  epistemic_distance?: EpistemicDistance;
+  collection_method?: CollectionMethod;
+  epistemic_status?: ObservationEpistemicStatus;
+  corroboration_level?: CorroborationLevel;
+  sample_n?: number;
+  sample_size_tier?: SampleSizeTier;
+  sampling_method?: SamplingMethod;
+  inclusion_criteria_documented?: boolean;
+  verbatim?: boolean;
+  page_ref?: string;
+}
+
 // ── Hypotheses ────────────────────────────────────────────────────────────────
 
 export interface HypothesisList {
   id: string;
   label: string;
+  hypothesis_type: HypothesisType;
   framework: HypothesisFramework;
   status: HypothesisStatus;
+  confidence_level: ConfidenceLevel;
   assumed_ontologies: string[] | null;
-  supporting_claim_count: number;
-  anomalous_claim_count: number;
+  supporting_observation_count: number;
+  anomalous_observation_count: number;
   created_at: string;
   updated_at: string;
 }
 
-export interface HypothesisRead {
-  id: string;
-  label: string;
+export interface HypothesisRead extends HypothesisList {
   description: string | null;
-  framework: HypothesisFramework;
-  status: HypothesisStatus;
-  assumed_ontologies: string[] | null;
-  required_assumptions: string[] | null;
+  falsification_condition: string | null;
+  scope: string | null;
+  parent_hypothesis_id: string | null;
   notes: string | null;
-  supporting_claim_count: number;
-  anomalous_claim_count: number;
-  scope_claims: ClaimRead[];
-  supporting_claims: ClaimRead[];
-  anomalous_claims: ClaimRead[];
-  created_at: string;
-  updated_at: string;
+  supporting_observations: ObservationRead[];
+  anomalous_observations: ObservationRead[];
+  competing_hypotheses: HypothesisList[];
 }
 
 export interface HypothesisCreate {
   label: string;
   description?: string;
+  hypothesis_type: HypothesisType;
+  falsification_condition?: string;
+  scope?: string;
   framework: HypothesisFramework;
-  status?: HypothesisStatus;
   assumed_ontologies?: string[];
-  required_assumptions?: string[];
+  status?: HypothesisStatus;
+  confidence_level?: ConfidenceLevel;
   notes?: string;
-  scope_claim_ids?: string[];
-  supporting_claim_ids?: string[];
-  anomalous_claim_ids?: string[];
+  supporting_observation_ids?: string[];
+  anomalous_observation_ids?: string[];
   competing_hypothesis_ids?: string[];
+  parent_hypothesis_id?: string;
 }
 
 export interface HypothesisUpdate {
   label?: string;
   description?: string;
+  hypothesis_type?: HypothesisType;
+  falsification_condition?: string;
+  scope?: string;
   framework?: HypothesisFramework;
-  status?: HypothesisStatus;
   assumed_ontologies?: string[];
-  required_assumptions?: string[];
+  status?: HypothesisStatus;
+  confidence_level?: ConfidenceLevel;
   notes?: string;
-  scope_claim_ids?: string[];
-  supporting_claim_ids?: string[];
-  anomalous_claim_ids?: string[];
+  supporting_observation_ids?: string[];
+  anomalous_observation_ids?: string[];
+  competing_hypothesis_ids?: string[];
+  parent_hypothesis_id?: string | null;
 }
+
+// ── TheoreticalFramework ──────────────────────────────────────────────────────
+
+export interface TheoreticalFrameworkList {
+  id: string;
+  label: string;
+  framework_type: HypothesisFramework;
+  status: FrameworkStatus;
+  confidence_level: ConfidenceLevel;
+  assumed_ontologies: string[] | null;
+  core_hypothesis_count: number;
+  anomalous_hypothesis_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TheoreticalFrameworkRead extends TheoreticalFrameworkList {
+  description: string | null;
+  notes: string | null;
+  core_hypotheses: HypothesisList[];
+  anomalous_hypotheses: HypothesisList[];
+}
+
+export interface TheoreticalFrameworkCreate {
+  label: string;
+  description?: string;
+  framework_type: HypothesisFramework;
+  assumed_ontologies?: string[];
+  status?: FrameworkStatus;
+  confidence_level?: ConfidenceLevel;
+  notes?: string;
+  core_hypothesis_ids?: string[];
+  anomalous_hypothesis_ids?: string[];
+}
+
+export interface TheoreticalFrameworkUpdate {
+  label?: string;
+  description?: string;
+  framework_type?: HypothesisFramework;
+  assumed_ontologies?: string[];
+  status?: FrameworkStatus;
+  confidence_level?: ConfidenceLevel;
+  notes?: string;
+  core_hypothesis_ids?: string[];
+  anomalous_hypothesis_ids?: string[];
+}
+
+// ── Concepts ──────────────────────────────────────────────────────────────────
 
 export interface ConceptRead {
   id: string;
   label: string;
   concept_type: ConceptType;
   description: string | null;
-  epistemic_status: EpistemicStatus | null;
-  supporting_claim_ids: string[];
+  epistemic_status: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -230,7 +356,6 @@ export interface ConceptRelationshipRead {
   relationship_type: RelationshipType;
   strength: RelationshipStrength;
   notes: string | null;
-  supporting_claim_ids: string[];
   created_at: string;
   updated_at: string;
 }

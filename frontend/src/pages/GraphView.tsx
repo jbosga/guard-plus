@@ -235,22 +235,7 @@ function DetailPanel({ detail, onClose }: {
           </div>
         )}
 
-        <div style={{ marginBottom: 16 }}>
-          <span style={{
-            fontSize: 10, fontFamily: 'var(--font-mono)',
-            color: 'var(--text-dim)', textTransform: 'uppercase',
-            letterSpacing: '0.06em', display: 'block', marginBottom: 4,
-          }}>
-            Supporting claims
-          </span>
-          <span style={{
-            fontSize: 20, fontWeight: 600,
-            color: concept.supporting_claim_ids.length > 0 ? 'var(--accent)' : 'var(--text-dim)',
-            fontFamily: 'var(--font-mono)',
-          }}>
-            {concept.supporting_claim_ids.length}
-          </span>
-        </div>
+        {/* Concept observation anchoring is a planned follow-on phase */}
 
         {/* Connections */}
         {connectedEdges.length > 0 && (
@@ -421,8 +406,8 @@ export function GraphView() {
         id: concept.id,
         label: concept.label,
         color: CONCEPT_TYPE_COLOR[concept.concept_type] ?? '#6b7280',
-        // Node size scales with claim count (clamped 20–48)
-        size: Math.min(48, Math.max(20, 20 + concept.supporting_claim_ids.length * 2)),
+        // Concept observation anchoring is a planned follow-on phase; size nodes equally for now
+        size: 28,
       },
     }));
 

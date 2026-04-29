@@ -1,13 +1,13 @@
 import React, { useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSource, getSourceClaims, triggerIngest, updateSource, uploadSourceFile } from '../api';
+import { getSource, getSourceObservations, triggerIngest, updateSource, uploadSourceFile } from '../api';
 import type { DisciplinaryFrame, ProvenanceQuality, SourceRead } from '../types';
-import { AddClaimModal } from '../components/AddClaimModal';
+import { AddObservationModal } from '../components/AddObservationModal';
 import {
   Page, Spinner, ErrorState, EmptyState,
   SourceTypeBadge, ProvenanceBadge, IngestionDot,
-  EpistemicBadge, ClaimTypeBadge,
+  ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
   Button, Card, Stat, SectionHeader, Select, Input,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
@@ -39,7 +39,7 @@ export function SourceDetail() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [ingestError, setIngestError] = useState('');
-  const [showAddClaim, setShowAddClaim] = useState(false);
+  const [showAddObs, setShowAddObs] = useState(false);
   const [editing, setEditing] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,9 +54,9 @@ export function SourceDetail() {
     },
   });
 
-  const { data: claims, isLoading: claimsLoading } = useQuery({
-    queryKey: ['source-claims', id],
-    queryFn: () => getSourceClaims(id!),
+  const { data: observations, isLoading: obsLoading } = useQuery({
+    queryKey: ['source-observations', id],
+    queryFn: () => getSourceObservations(id!),
     enabled: !!id,
   });
 
@@ -105,42 +105,43 @@ export function SourceDetail() {
           {/* Left column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
-            {/* Claims */}
+            {/* Observations */}
             <div>
               <SectionHeader action={
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
-                  {claims?.length ?? 0} claims
+                  {observations?.length ?? 0} observations
                 </span>
               }>
-                Extracted Claims
+                Extracted Observations
               </SectionHeader>
 
-              {claimsLoading && <Spinner />}
+              {obsLoading && <Spinner />}
 
-              {claims && claims.length === 0 && (
-                <EmptyState message="no claims extracted yet" />
+              {observations && observations.length === 0 && (
+                <EmptyState message="no observations extracted yet" />
               )}
 
-              {claims && claims.map(claim => (
+              {observations && observations.map(obs => (
                 <div
-                  key={claim.id}
+                  key={obs.id}
                   style={{
                     padding: 'var(--space-4)',
                     borderBottom: '1px solid var(--border-dim)',
                   }}
                 >
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <EpistemicBadge status={claim.epistemic_status} />
-                    <ClaimTypeBadge type={claim.claim_type} />
-                    {claim.page_ref && (
+                    <ObservationEpistemicBadge status={obs.epistemic_status} />
+                    <ContentTypeBadge type={obs.content_type} />
+                    <CollectionMethodBadge method={obs.collection_method} />
+                    {obs.page_ref && (
                       <span style={{
                         fontFamily: 'var(--font-mono)', fontSize: 10,
                         color: 'var(--text-dim)',
                       }}>
-                        p.{claim.page_ref}
+                        p.{obs.page_ref}
                       </span>
                     )}
-                    {claim.ai_extracted && !claim.reviewed_at && (
+                    {obs.ai_extracted && !obs.reviewed_at && (
                       <span style={{
                         fontFamily: 'var(--font-mono)', fontSize: 10,
                         color: 'var(--status-warn)',
@@ -151,28 +152,38 @@ export function SourceDetail() {
                         unreviewed
                       </span>
                     )}
+                    {obs.epistemic_distance === 'aggregated' && obs.sample_n != null && (
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10,
+                        color: 'var(--text-dim)',
+                        border: '1px solid var(--border-dim)',
+                        padding: '1px 6px', borderRadius: 20,
+                      }}>
+                        n={obs.sample_n}
+                      </span>
+                    )}
                   </div>
                   <p style={{
                     fontSize: 13,
-                    fontFamily: claim.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
+                    fontFamily: obs.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
                     color: 'var(--text-primary)',
                     lineHeight: 1.6,
                   }}>
-                    {claim.verbatim && (
+                    {obs.verbatim && (
                       <span style={{ color: 'var(--text-dim)', marginRight: 4 }}>"</span>
                     )}
-                    {claim.claim_text}
-                    {claim.verbatim && (
+                    {obs.content}
+                    {obs.verbatim && (
                       <span style={{ color: 'var(--text-dim)', marginLeft: 2 }}>"</span>
                     )}
                   </p>
-                  {claim.reviewed_by && (
+                  {obs.reviewed_by && (
                     <div style={{
                       marginTop: 'var(--space-2)',
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: 'var(--text-dim)',
                     }}>
-                      reviewed by {claim.reviewed_by}
+                      reviewed by {obs.reviewed_by}
                     </div>
                   )}
                 </div>
@@ -199,7 +210,7 @@ export function SourceDetail() {
 
             {/* Stats */}
             <Card style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-5)' }}>
-              <Stat label="Claims" value={source.claim_count} />
+              <Stat label="Observations" value={source.observation_count} />
               <Stat label="Year" value={source.publication_date ?? '—'} />
             </Card>
 
@@ -304,7 +315,6 @@ export function SourceDetail() {
                   </div>
                 )}
 
-                {/* File upload */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -346,7 +356,7 @@ export function SourceDetail() {
                     fontFamily: 'var(--font-mono)', fontSize: 10,
                     color: 'var(--text-dim)', lineHeight: 1.5,
                   }}>
-                    Upload a file to enable AI claim extraction
+                    Upload a file to enable AI observation extraction
                   </p>
                 )}
 
@@ -371,21 +381,21 @@ export function SourceDetail() {
                       display: 'inline-flex', alignItems: 'center', gap: 4,
                     }}
                   >
-                    → review extracted claims
+                    → review extracted observations
                   </Link>
                 )}
               </div>
             </Card>
 
-            {/* Manual claims */}
+            {/* Manual entry */}
             <Card style={{ padding: 'var(--space-4)' }}>
               <SectionHeader>Manual Entry</SectionHeader>
               <Button
                 size="sm"
                 variant="primary"
-                onClick={() => setShowAddClaim(true)}
+                onClick={() => setShowAddObs(true)}
               >
-                + add claim
+                + add observation
               </Button>
             </Card>
 
@@ -400,13 +410,13 @@ export function SourceDetail() {
         </div>
       </Page>
 
-      {showAddClaim && (
-        <AddClaimModal
+      {showAddObs && (
+        <AddObservationModal
           sourceId={source.id}
-          onClose={() => setShowAddClaim(false)}
+          onClose={() => setShowAddObs(false)}
           onCreated={() => {
-            setShowAddClaim(false);
-            qc.invalidateQueries({ queryKey: ['source-claims', id] });
+            setShowAddObs(false);
+            qc.invalidateQueries({ queryKey: ['source-observations', id] });
             qc.invalidateQueries({ queryKey: ['source', id] });
           }}
         />

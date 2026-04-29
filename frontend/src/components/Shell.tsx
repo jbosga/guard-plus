@@ -2,11 +2,12 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const NAV_ITEMS = [
-  { path: '/sources',    label: 'Sources',       icon: '📄' },
-  { path: '/claims',     label: 'Claims',        icon: '🔖' },
-  { path: '/review',     label: 'Review Queue',  icon: '✅' },
-  { path: '/graph',      label: 'Graph',         icon: '◈'  },
-  { path: '/hypotheses', label: 'Hypotheses',    icon: '🔬' },
+  { path: '/sources',      label: 'Sources',      icon: '📄' },
+  { path: '/observations', label: 'Observations', icon: '🔭' },
+  { path: '/review',       label: 'Review Queue', icon: '✅' },
+  { path: '/hypotheses',   label: 'Hypotheses',   icon: '🔬' },
+  { path: '/frameworks',   label: 'Frameworks',   icon: '🧩' },
+  { path: '/graph',        label: 'Graph',        icon: '◈'  },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {

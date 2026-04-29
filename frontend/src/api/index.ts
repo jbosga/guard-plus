@@ -2,12 +2,13 @@ import { client } from './client';
 import type {
   Token, Page,
   SourceList, SourceRead, SourceCreate, SourceUpdate,
-  ClaimRead,
-  HypothesisList,
   DisciplinaryFrame, ProvenanceQuality, SourceType,
-  EpistemicStatus, ClaimType,  ConceptRead, ConceptRelationshipRead, 
-  HypothesisRead, HypothesisCreate, HypothesisUpdate,
-
+  ObservationRead, ObservationCreate, ObservationUpdate,
+  ObservationEpistemicStatus, ContentType, EpistemicDistance,
+  ConceptRead, ConceptRelationshipRead,
+  HypothesisList, HypothesisRead, HypothesisCreate, HypothesisUpdate,
+  TheoreticalFrameworkList, TheoreticalFrameworkRead,
+  TheoreticalFrameworkCreate, TheoreticalFrameworkUpdate,
 } from '../types';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -67,64 +68,52 @@ export async function triggerIngest(sourceId: string, method: 'ai' | 'manual' = 
   return data;
 }
 
-// ── Claims ────────────────────────────────────────────────────────────────────
+// ── Observations ──────────────────────────────────────────────────────────────
 
-export interface ClaimsParams {
+export interface ObservationsParams {
   page?: number;
   page_size?: number;
   source_id?: string;
-  epistemic_status?: EpistemicStatus | EpistemicStatus[];
-  claim_type?: ClaimType | ClaimType[];
+  epistemic_status?: ObservationEpistemicStatus | ObservationEpistemicStatus[];
+  content_type?: ContentType | ContentType[];
+  epistemic_distance?: EpistemicDistance;
   ai_extracted?: boolean;
   unreviewed?: boolean;
   search?: string;
 }
 
-export async function getClaims(params: ClaimsParams = {}): Promise<Page<ClaimRead>> {
-  const { data } = await client.get<Page<ClaimRead>>('/claims', { params });
+export async function getObservations(params: ObservationsParams = {}): Promise<Page<ObservationRead>> {
+  const { data } = await client.get<Page<ObservationRead>>('/observations', { params });
   return data;
 }
 
-export async function getSourceClaims(sourceId: string): Promise<ClaimRead[]> {
-  const { data } = await client.get<ClaimRead[]>(`/sources/${sourceId}/claims`);
+export async function getSourceObservations(sourceId: string): Promise<ObservationRead[]> {
+  const { data } = await client.get<ObservationRead[]>(`/sources/${sourceId}/observations`);
   return data;
 }
 
-export async function getReviewQueue(params: { page?: number; page_size?: number; source_id?: string } = {}): Promise<Page<ClaimRead>> {
-  const { data } = await client.get<Page<ClaimRead>>('/claims/review-queue', { params });
+export async function getReviewQueue(params: { page?: number; page_size?: number; source_id?: string } = {}): Promise<Page<ObservationRead>> {
+  const { data } = await client.get<Page<ObservationRead>>('/observations/review-queue', { params });
   return data;
 }
 
-export async function reviewClaim(claimId: string, payload: {
+export async function reviewObservation(id: string, payload: {
   accepted: boolean;
-  edited_text?: string;
-  epistemic_status?: EpistemicStatus;
-  claim_type?: ClaimType;
-}): Promise<ClaimRead> {
-  const { data } = await client.post<ClaimRead>(`/claims/${claimId}/review`, payload);
+  edited_content?: string;
+  epistemic_status?: ObservationEpistemicStatus;
+  content_type?: ContentType;
+}): Promise<ObservationRead> {
+  const { data } = await client.post<ObservationRead>(`/observations/${id}/review`, payload);
   return data;
 }
 
-export interface ClaimCreatePayload {
-  source_id: string;
-  claim_text: string;
-  verbatim?: boolean;
-  page_ref?: string;
-  epistemic_status?: EpistemicStatus;
-  claim_type: ClaimType;
-}
-
-export async function createClaim(payload: ClaimCreatePayload): Promise<ClaimRead> {
-  const { data } = await client.post<ClaimRead>('/claims', payload);
+export async function createObservation(payload: ObservationCreate): Promise<ObservationRead> {
+  const { data } = await client.post<ObservationRead>('/observations', payload);
   return data;
 }
 
-export async function updateClaim(claimId: string, payload: {
-  claim_text?: string;
-  epistemic_status?: EpistemicStatus;
-  claim_type?: ClaimType;
-}): Promise<ClaimRead> {
-  const { data } = await client.patch<ClaimRead>(`/claims/${claimId}`, payload);
+export async function updateObservation(id: string, payload: ObservationUpdate): Promise<ObservationRead> {
+  const { data } = await client.patch<ObservationRead>(`/observations/${id}`, payload);
   return data;
 }
 
@@ -160,6 +149,39 @@ export async function deleteHypothesis(id: string): Promise<void> {
   await client.delete(`/hypotheses/${id}`);
 }
 
+// ── Frameworks ────────────────────────────────────────────────────────────────
+
+export async function getFrameworks(params: {
+  page?: number;
+  page_size?: number;
+  status?: string;
+  search?: string;
+} = {}): Promise<Page<TheoreticalFrameworkList>> {
+  const { data } = await client.get<Page<TheoreticalFrameworkList>>('/frameworks', { params });
+  return data;
+}
+
+export async function getFramework(id: string): Promise<TheoreticalFrameworkRead> {
+  const { data } = await client.get<TheoreticalFrameworkRead>(`/frameworks/${id}`);
+  return data;
+}
+
+export async function createFramework(payload: TheoreticalFrameworkCreate): Promise<TheoreticalFrameworkRead> {
+  const { data } = await client.post<TheoreticalFrameworkRead>('/frameworks', payload);
+  return data;
+}
+
+export async function updateFramework(id: string, payload: TheoreticalFrameworkUpdate): Promise<TheoreticalFrameworkRead> {
+  const { data } = await client.patch<TheoreticalFrameworkRead>(`/frameworks/${id}`, payload);
+  return data;
+}
+
+export async function deleteFramework(id: string): Promise<void> {
+  await client.delete(`/frameworks/${id}`);
+}
+
+// ── Concepts ──────────────────────────────────────────────────────────────────
+
 export async function getConcepts(params: {
   page?: number;
   page_size?: number;
@@ -186,7 +208,6 @@ export async function createConcept(payload: {
   concept_type: string;
   description?: string;
   epistemic_status?: string;
-  supporting_claim_ids?: string[];
 }): Promise<ConceptRead> {
   const { data } = await client.post<ConceptRead>('/concepts', payload);
   return data;
@@ -198,7 +219,6 @@ export async function createRelationship(payload: {
   relationship_type: string;
   strength?: string;
   notes?: string;
-  supporting_claim_ids?: string[];
 }): Promise<ConceptRelationshipRead> {
   const { data } = await client.post<ConceptRelationshipRead>('/concepts/relationships/', payload);
   return data;

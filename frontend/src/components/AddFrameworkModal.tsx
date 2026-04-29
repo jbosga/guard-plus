@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createHypothesis } from '../api';
-import type { HypothesisFramework, HypothesisStatus, HypothesisType, ConfidenceLevel } from '../types';
+import { createFramework } from '../api';
+import type { HypothesisFramework, FrameworkStatus, ConfidenceLevel } from '../types';
 import { Button, Input, Select } from './ui';
 
 interface Props {
@@ -27,14 +27,6 @@ const STATUS_OPTIONS = [
   { value: 'refuted',   label: 'Refuted' },
 ];
 
-const TYPE_OPTIONS = [
-  { value: 'causal',        label: 'Causal' },
-  { value: 'correlational', label: 'Correlational' },
-  { value: 'mechanistic',   label: 'Mechanistic' },
-  { value: 'taxonomic',     label: 'Taxonomic' },
-  { value: 'predictive',    label: 'Predictive' },
-];
-
 const CONFIDENCE_OPTIONS = [
   { value: 'speculative', label: 'Speculative' },
   { value: 'plausible',   label: 'Plausible' },
@@ -46,16 +38,14 @@ const ONTOLOGY_OPTIONS = [
   'physicalism', 'dualism', 'panpsychism', 'idealism', 'unknown', 'novel',
 ];
 
-export function AddHypothesisModal({ onClose }: Props) {
+export function AddFrameworkModal({ onClose }: Props) {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     label: '',
-    hypothesis_type: 'causal' as HypothesisType,
-    framework: 'unknown' as HypothesisFramework,
-    status: 'active' as HypothesisStatus,
+    framework_type: 'unknown' as HypothesisFramework,
+    status: 'active' as FrameworkStatus,
     confidence_level: 'speculative' as ConfidenceLevel,
     description: '',
-    falsification_condition: '',
     notes: '',
   });
   const [selectedOntologies, setSelectedOntologies] = useState<string[]>([]);
@@ -78,21 +68,19 @@ export function AddHypothesisModal({ onClose }: Props) {
     setLoading(true);
     setError('');
     try {
-      const hyp = await createHypothesis({
-        label:                   form.label.trim(),
-        hypothesis_type:         form.hypothesis_type,
-        framework:               form.framework,
-        status:                  form.status,
-        confidence_level:        form.confidence_level,
-        description:             form.description.trim() || undefined,
-        falsification_condition: form.falsification_condition.trim() || undefined,
-        notes:                   form.notes.trim() || undefined,
-        assumed_ontologies:      selectedOntologies.length ? selectedOntologies : undefined,
+      const fw = await createFramework({
+        label:            form.label.trim(),
+        framework_type:   form.framework_type,
+        status:           form.status,
+        confidence_level: form.confidence_level,
+        description:      form.description.trim() || undefined,
+        notes:            form.notes.trim() || undefined,
+        assumed_ontologies: selectedOntologies.length ? selectedOntologies : undefined,
       });
       onClose();
-      navigate(`/hypotheses/${hyp.id}`);
+      navigate(`/frameworks/${fw.id}`);
     } catch {
-      setError('Failed to create hypothesis');
+      setError('Failed to create framework');
     } finally {
       setLoading(false);
     }
@@ -112,7 +100,7 @@ export function AddHypothesisModal({ onClose }: Props) {
         background: 'var(--bg-1)',
         border: '1px solid var(--border-mid)',
         borderRadius: 4,
-        width: 580,
+        width: 560,
         maxHeight: '85vh',
         overflow: 'auto',
         padding: 'var(--space-5)',
@@ -126,7 +114,7 @@ export function AddHypothesisModal({ onClose }: Props) {
             letterSpacing: '0.1em', textTransform: 'uppercase',
             color: 'var(--text-dim)',
           }}>
-            New Hypothesis
+            New Framework
           </span>
           <button
             onClick={onClose}
@@ -141,23 +129,15 @@ export function AddHypothesisModal({ onClose }: Props) {
             onChange={e => set('label', e.target.value)}
             required
             autoFocus
-            placeholder="e.g. Sleep paralysis hallucinatory hypothesis"
+            placeholder="e.g. Neurological sleep disorder framework"
           />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-            <Select
-              label="Hypothesis type *"
-              options={TYPE_OPTIONS}
-              value={form.hypothesis_type}
-              onChange={e => set('hypothesis_type', e.target.value)}
-            />
-            <Select
-              label="Framework"
-              options={FRAMEWORK_OPTIONS}
-              value={form.framework}
-              onChange={e => set('framework', e.target.value)}
-            />
-          </div>
+          <Select
+            label="Framework type *"
+            options={FRAMEWORK_OPTIONS}
+            value={form.framework_type}
+            onChange={e => set('framework_type', e.target.value)}
+          />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <Select
@@ -183,7 +163,7 @@ export function AddHypothesisModal({ onClose }: Props) {
               value={form.description}
               onChange={e => set('description', e.target.value)}
               rows={3}
-              placeholder="What does this hypothesis claim to explain?"
+              placeholder="What explanatory approach does this framework take?"
               style={{
                 background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
                 borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
@@ -192,25 +172,6 @@ export function AddHypothesisModal({ onClose }: Props) {
             />
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{
-              fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-              color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
-            }}>Falsification condition</span>
-            <textarea
-              value={form.falsification_condition}
-              onChange={e => set('falsification_condition', e.target.value)}
-              rows={2}
-              placeholder="What evidence would falsify this hypothesis?"
-              style={{
-                background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
-                borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
-                padding: '6px 10px', fontSize: 13, outline: 'none', resize: 'vertical',
-              }}
-            />
-          </label>
-
-          {/* Assumed ontologies */}
           <div>
             <span style={{
               fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
@@ -230,11 +191,8 @@ export function AddHypothesisModal({ onClose }: Props) {
                       border: `1px solid ${active ? 'var(--accent)' : 'var(--border-dim)'}`,
                       borderRadius: 20,
                       color: active ? '#000' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontSize: 11,
-                      padding: '3px 10px',
-                      fontFamily: 'var(--font-mono)',
-                      transition: 'var(--t-fast)',
+                      cursor: 'pointer', fontSize: 11, padding: '3px 10px',
+                      fontFamily: 'var(--font-mono)', transition: 'var(--t-fast)',
                     }}
                   >
                     {o}
@@ -261,10 +219,6 @@ export function AddHypothesisModal({ onClose }: Props) {
             />
           </label>
 
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-            Observation linking happens on the workspace page after creation.
-          </p>
-
           {error && (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--status-error)' }}>
               ✗ {error}
@@ -274,7 +228,7 @@ export function AddHypothesisModal({ onClose }: Props) {
           <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
             <Button type="button" variant="ghost" onClick={onClose}>cancel</Button>
             <Button type="submit" variant="primary" disabled={loading || !form.label.trim()}>
-              {loading ? 'creating…' : 'create hypothesis'}
+              {loading ? 'creating…' : 'create framework'}
             </Button>
           </div>
         </form>

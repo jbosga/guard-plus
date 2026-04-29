@@ -152,7 +152,7 @@ export function SourceList() {
               }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                    {['Title', 'Type', 'Discipline', 'Provenance', 'Year', 'Claims', 'Ingestion'].map(h => (
+                    {['Title', 'Type', 'Discipline', 'Provenance', 'Year', 'Obs.', 'Ingestion'].map(h => (
                       <th key={h} style={{
                         textAlign: 'left', padding: '6px 12px',
                         fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase',
@@ -226,9 +226,9 @@ export function SourceList() {
                       <td style={{ padding: '8px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <span style={{
                           fontWeight: 500,
-                          color: source.claim_count > 0 ? 'var(--accent)' : 'var(--text-dim)',
+                          color: source.observation_count > 0 ? 'var(--accent)' : 'var(--text-dim)',
                         }}>
-                          {source.claim_count}
+                          {source.observation_count}
                         </span>
                       </td>
                       <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
