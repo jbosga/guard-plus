@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -11,7 +12,7 @@ from app.models.corpus import Observation
 from app.models.enums import HypothesisFramework, HypothesisStatus
 from app.models.user import User
 from app.models.synthesis import (
-    HypothesisCreate, HypothesisUpdate, HypothesisList, HypothesisRead,
+    HypothesisCreate, HypothesisUpdate, HypothesisList, HypothesisRead, HypothesisReview,
 )
 from app.models.common import Page
 from app.core.security import get_current_user
@@ -52,6 +53,7 @@ def _to_list(h: Hypothesis) -> HypothesisList:
     d = HypothesisList.model_validate(h)
     d.supporting_observation_count = len(h.supporting_observations)
     d.anomalous_observation_count = len(h.anomalous_observations)
+    d.source_title = h.source.title if h.source else None
     if h.assumed_ontologies:
         d.assumed_ontologies = json.loads(h.assumed_ontologies) if isinstance(h.assumed_ontologies, str) else h.assumed_ontologies
     return d
@@ -88,7 +90,7 @@ def _set_warning_headers(response: Response, h: Hypothesis) -> None:
 @router.get("", response_model=Page[HypothesisList])
 def list_hypotheses(
     page: int = Query(1, ge=1),
-    page_size: int = Query(25, ge=1, le=100),
+    page_size: int = Query(25, ge=1, le=500),
     framework: Optional[HypothesisFramework] = None,
     status_filter: Optional[HypothesisStatus] = Query(None, alias="status"),
     search: Optional[str] = None,
@@ -141,6 +143,63 @@ def create_hypothesis(
     db.refresh(hyp)
     _set_warning_headers(response, hyp)
     return _to_read(hyp)
+
+
+# ── Review queue ─────────────────────────────────────────────────────────────
+
+@router.get("/review-queue", response_model=Page[HypothesisList])
+def hypothesis_review_queue(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    source_id: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Unreviewed AI-extracted hypotheses, oldest-first."""
+    q = (
+        db.query(Hypothesis)
+        .filter(Hypothesis.ai_extracted == True)
+        .filter(Hypothesis.reviewed_at.is_(None))
+    )
+    if source_id:
+        q = q.filter(Hypothesis.source_id == source_id)
+    total = q.count()
+    items = q.order_by(Hypothesis.created_at.asc()).offset((page - 1) * page_size).limit(page_size).all()
+    return Page.create(items=[_to_list(h) for h in items], total=total, page=page, page_size=page_size)
+
+
+@router.post("/{hypothesis_id}/review", response_model=HypothesisList)
+def review_hypothesis(
+    hypothesis_id: UUID,
+    review: HypothesisReview,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Accept (with optional edits) or reject an AI-extracted hypothesis."""
+    hyp = _get_or_404(hypothesis_id, db)
+
+    if not review.accepted:
+        db.delete(hyp)
+        db.commit()
+        raise HTTPException(status_code=200, detail="Hypothesis rejected and deleted")
+
+    if review.edited_label:
+        hyp.label = review.edited_label
+    if review.edited_description is not None:
+        hyp.description = review.edited_description
+    if review.hypothesis_type:
+        hyp.hypothesis_type = review.hypothesis_type
+    if review.framework:
+        hyp.framework = review.framework
+    if review.confidence_level:
+        hyp.confidence_level = review.confidence_level
+
+    hyp.reviewed_by = current_user.username
+    hyp.reviewed_at = datetime.now(timezone.utc).isoformat()
+
+    db.commit()
+    db.refresh(hyp)
+    return _to_list(hyp)
 
 
 # ── Read ──────────────────────────────────────────────────────────────────────

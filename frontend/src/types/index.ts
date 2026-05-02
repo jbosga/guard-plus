@@ -242,8 +242,22 @@ export interface HypothesisList {
   assumed_ontologies: string[] | null;
   supporting_observation_count: number;
   anomalous_observation_count: number;
+  ai_extracted: boolean;
+  source_id: string | null;
+  source_title?: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface HypothesisReview {
+  accepted: boolean;
+  edited_label?: string;
+  edited_description?: string;
+  hypothesis_type?: HypothesisType;
+  framework?: HypothesisFramework;
+  confidence_level?: ConfidenceLevel;
 }
 
 export interface HypothesisRead extends HypothesisList {

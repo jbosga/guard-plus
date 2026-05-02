@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 
+import sqlalchemy as sa
 from sqlalchemy import String, Text, Enum, ForeignKey, Table, Column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,7 +24,7 @@ from app.models.enums import (
     FrameworkStatus,
     EpistemicNoteType, AttachableEntityType,
 )
-from app.models.corpus import Observation, ObservationRead
+from app.models.corpus import Observation, Source, ObservationRead
 
 
 # ── Association tables ────────────────────────────────────────────────────────
@@ -131,8 +132,19 @@ class Hypothesis(Base, TimestampMixin):
     parent_hypothesis_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("hypotheses.id"), nullable=True
     )
+    source_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    ai_extracted: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default="false"
+    )
+    reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    reviewed_at: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    source: Mapped[Optional["Source"]] = relationship(
+        "Source", foreign_keys=[source_id]
+    )
     supporting_observations: Mapped[List[Observation]] = relationship(
         "Observation", secondary=hypothesis_supporting_observations
     )
@@ -315,10 +327,24 @@ class HypothesisList(BaseModel):
     assumed_ontologies: Optional[List[AssumedOntology]] = None
     supporting_observation_count: int = 0
     anomalous_observation_count: int = 0
+    ai_extracted: bool = False
+    source_id: Optional[uuid.UUID] = None
+    source_title: Optional[str] = None
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class HypothesisReview(BaseModel):
+    accepted: bool
+    edited_label: Optional[str] = None
+    edited_description: Optional[str] = None
+    hypothesis_type: Optional[HypothesisType] = None
+    framework: Optional[HypothesisFramework] = None
+    confidence_level: Optional[ConfidenceLevel] = None
 
 
 class HypothesisRead(HypothesisList):

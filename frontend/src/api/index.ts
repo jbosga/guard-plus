@@ -6,7 +6,7 @@ import type {
   ObservationRead, ObservationCreate, ObservationUpdate,
   ObservationEpistemicStatus, ContentType, EpistemicDistance,
   ConceptRead, ConceptRelationshipRead,
-  HypothesisList, HypothesisRead, HypothesisCreate, HypothesisUpdate,
+  HypothesisList, HypothesisRead, HypothesisCreate, HypothesisUpdate, HypothesisReview,
   TheoreticalFrameworkList, TheoreticalFrameworkRead,
   TheoreticalFrameworkCreate, TheoreticalFrameworkUpdate,
 } from '../types';
@@ -147,6 +147,16 @@ export async function updateHypothesis(id: string, payload: HypothesisUpdate): P
 
 export async function deleteHypothesis(id: string): Promise<void> {
   await client.delete(`/hypotheses/${id}`);
+}
+
+export async function getHypothesisReviewQueue(params: { page?: number; page_size?: number; source_id?: string } = {}): Promise<Page<HypothesisList>> {
+  const { data } = await client.get<Page<HypothesisList>>('/hypotheses/review-queue', { params });
+  return data;
+}
+
+export async function reviewHypothesis(id: string, payload: HypothesisReview): Promise<HypothesisList> {
+  const { data } = await client.post<HypothesisList>(`/hypotheses/${id}/review`, payload);
+  return data;
 }
 
 // ── Frameworks ────────────────────────────────────────────────────────────────

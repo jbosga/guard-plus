@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.corpus import Observation, Source
+from app.models.synthesis import Hypothesis
 from app.models.enums import (
     ContentType,
     SourceModality,
@@ -43,6 +44,10 @@ from app.models.enums import (
     ObservationEpistemicStatus,
     IngestionMethod,
     IngestionStatus,
+    HypothesisType,
+    HypothesisFramework,
+    HypothesisStatus,
+    ConfidenceLevel,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,6 +60,7 @@ _OCR_DPI = 300
 _MAX_TEXT_CHARS = 120_000
 _EXTRACTION_MODEL = "claude-sonnet-4-6"
 _MAX_OBSERVATIONS_PER_SOURCE = 100
+_MAX_HYPOTHESES_PER_SOURCE = 10
 
 
 # ── Result types ──────────────────────────────────────────────────────────────
@@ -82,6 +88,18 @@ class ObservationDraft:
 
 
 @dataclass
+class HypothesisDraft:
+    """A single hypothesis proposed by Claude, before DB insertion."""
+    label: str
+    hypothesis_type: HypothesisType
+    framework: HypothesisFramework
+    description: Optional[str] = None
+    falsification_condition: Optional[str] = None
+    scope: Optional[str] = None
+    confidence_level: ConfidenceLevel = ConfidenceLevel.SPECULATIVE
+
+
+@dataclass
 class IngestionResult:
     """Final outcome returned to the route handler."""
     source_id: str
@@ -89,6 +107,7 @@ class IngestionResult:
     status: IngestionStatus
     raw_text: Optional[str] = None
     observations_inserted: int = 0
+    hypotheses_inserted: int = 0
     ocr_pages: int = 0
     error: Optional[str] = None
 
@@ -160,13 +179,18 @@ def extract_text(source: Source, storage_path: str) -> ExtractionResult:
 
 _SYSTEM_PROMPT = """\
 You are a rigorous research assistant supporting a scientific study of the \
-anomalous abduction experience (AAE). Your task is to extract discrete, \
-atomic observations from the provided source text.
+anomalous abduction experience (AAE). Your task is to extract two things from \
+the provided source text: (1) discrete atomic observations, and (2) hypotheses \
+the source authors themselves propose.
 
 EPISTEMOLOGICAL STANCE
 The research program is neither credulous nor dismissive. First-person \
 accounts are treated as empirical data. Your job is to extract what the \
 source actually says — not to validate or debunk it.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 1 — OBSERVATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SCOPE: NOVEL OBSERVATIONS ONLY
 Extract only observations that the authors of this source make in their own \
@@ -221,35 +245,85 @@ epistemic_status — confidence level of the observation:
   artefactual   — likely an artifact of the collection method
   retracted     — subsequently withdrawn
 
-OUTPUT FORMAT
-Return ONLY a valid JSON array. No preamble, no markdown fences. Each element:
-  content           (string, required)
-  content_type      (string, required, one of the values above)
-  source_modality   (string, required, one of the values above)
-  epistemic_distance (string, required, one of the values above)
-  collection_method (string, required, one of the values above)
-  epistemic_status  (string, required, one of the values above)
-  page_ref          (string or null)
-  verbatim          (boolean)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 2 — HYPOTHESES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Example:
-[
-  {
-    "content": "Fourteen of 19 participants reported a sensation of paralysis \
-at the onset of the experience.",
-    "content_type": "experiential",
-    "source_modality": "investigator_summary",
-    "epistemic_distance": "direct",
-    "collection_method": "structured_interview",
-    "epistemic_status": "reported",
-    "page_ref": "47",
-    "verbatim": false
-  }
-]
+Extract hypotheses that the source authors explicitly propose or endorse as \
+explanatory frameworks. A hypothesis is an explanatory claim, not a data \
+point. First-person accounts will typically yield zero hypotheses; theoretical \
+papers may yield several.
+
+DO NOT extract:
+  - Observations or data points (those belong in Part 1)
+  - Hypotheses the authors attribute to others without endorsing
+  - Vague implications — only explicit explanatory claims
+
+FIELD DEFINITIONS
+
+hypothesis_type:
+  causal         — proposes a cause-effect relationship
+  correlational  — proposes an association without causal claim
+  mechanistic    — proposes a mechanism or process
+  taxonomic      — proposes a classification or typology
+  predictive     — makes a testable prediction
+
+framework:
+  neurological        — brain/nervous-system explanation
+  psychological       — psychological or cognitive explanation
+  sociocultural       — cultural, social, or memetic explanation
+  physical            — conventional physical explanation
+  interdimensional    — non-standard ontology (other dimensions, etc.)
+  information_theoretic — information or consciousness-based
+  psychospiritual     — spiritual or transpersonal framework
+  unknown             — framework cannot be determined
+
+confidence_level (as expressed by the source authors):
+  speculative  — tentative, exploratory
+  plausible    — authors consider it likely
+  supported    — authors claim empirical backing
+  contested    — authors note active disagreement
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Return ONLY a valid JSON object with exactly two keys. No preamble, no \
+markdown fences.
+
+{
+  "observations": [
+    {
+      "content": (string, required),
+      "content_type": (string, required),
+      "source_modality": (string, required),
+      "epistemic_distance": (string, required),
+      "collection_method": (string, required),
+      "epistemic_status": (string, required),
+      "page_ref": (string or null),
+      "verbatim": (boolean)
+    }
+  ],
+  "hypotheses": [
+    {
+      "label": (string, required — concise name for the hypothesis),
+      "description": (string or null — 1-3 sentence summary),
+      "hypothesis_type": (string, required),
+      "framework": (string, required),
+      "falsification_condition": (string or null — what evidence would refute it),
+      "scope": (string or null — what phenomena it purports to explain),
+      "confidence_level": (string, required)
+    }
+  ]
+}
+
+"hypotheses" may be an empty array if the source proposes no explicit hypotheses.
 """
 
 
-def _call_claude(raw_text: str, source_title: str) -> list[ObservationDraft]:
+def _call_claude(
+    raw_text: str, source_title: str
+) -> tuple[list[ObservationDraft], list[HypothesisDraft]]:
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     user_message = (
@@ -259,7 +333,7 @@ def _call_claude(raw_text: str, source_title: str) -> list[ObservationDraft]:
 
     response = client.messages.create(
         model=_EXTRACTION_MODEL,
-        max_tokens=8192,
+        max_tokens=16384,
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
     )
@@ -273,13 +347,13 @@ def _call_claude(raw_text: str, source_title: str) -> list[ObservationDraft]:
     except json.JSONDecodeError as e:
         raise ValueError(f"Claude returned non-JSON response: {e}\nRaw: {raw_content[:500]}")
 
-    if not isinstance(data, list):
-        raise ValueError(f"Expected JSON array, got {type(data).__name__}")
+    if not isinstance(data, dict) or "observations" not in data:
+        raise ValueError(f"Expected JSON object with 'observations' key, got: {raw_content[:200]}")
 
-    drafts: list[ObservationDraft] = []
-    for i, item in enumerate(data[:_MAX_OBSERVATIONS_PER_SOURCE]):
+    obs_drafts: list[ObservationDraft] = []
+    for i, item in enumerate(data["observations"][:_MAX_OBSERVATIONS_PER_SOURCE]):
         try:
-            drafts.append(ObservationDraft(
+            obs_drafts.append(ObservationDraft(
                 content=str(item["content"]).strip(),
                 content_type=ContentType(item["content_type"]),
                 source_modality=SourceModality(item["source_modality"]),
@@ -294,7 +368,24 @@ def _call_claude(raw_text: str, source_title: str) -> list[ObservationDraft]:
         except (KeyError, ValueError) as e:
             logger.warning("Skipping malformed observation at index %d: %s — %s", i, item, e)
 
-    return drafts
+    hyp_drafts: list[HypothesisDraft] = []
+    for i, item in enumerate(data.get("hypotheses", [])[:_MAX_HYPOTHESES_PER_SOURCE]):
+        try:
+            hyp_drafts.append(HypothesisDraft(
+                label=str(item["label"]).strip(),
+                hypothesis_type=HypothesisType(item["hypothesis_type"]),
+                framework=HypothesisFramework(item["framework"]),
+                description=str(item["description"]).strip() if item.get("description") else None,
+                falsification_condition=str(item["falsification_condition"]).strip() if item.get("falsification_condition") else None,
+                scope=str(item["scope"]).strip() if item.get("scope") else None,
+                confidence_level=ConfidenceLevel(
+                    item.get("confidence_level", ConfidenceLevel.SPECULATIVE)
+                ),
+            ))
+        except (KeyError, ValueError) as e:
+            logger.warning("Skipping malformed hypothesis at index %d: %s — %s", i, item, e)
+
+    return obs_drafts, hyp_drafts
 
 
 # ── DB writes ─────────────────────────────────────────────────────────────────
@@ -329,6 +420,31 @@ def _insert_observations(
         db.add(obs)
         inserted += 1
 
+    return inserted
+
+
+def _insert_hypotheses(
+    db: Session,
+    source: Source,
+    drafts: list[HypothesisDraft],
+) -> int:
+    inserted = 0
+    for draft in drafts:
+        hyp = Hypothesis(
+            id=uuid4(),
+            source_id=source.id,
+            label=draft.label,
+            description=draft.description,
+            hypothesis_type=draft.hypothesis_type,
+            framework=draft.framework,
+            falsification_condition=draft.falsification_condition,
+            scope=draft.scope,
+            confidence_level=draft.confidence_level,
+            status=HypothesisStatus.ACTIVE,
+            ai_extracted=True,
+        )
+        db.add(hyp)
+        inserted += 1
     return inserted
 
 
@@ -376,7 +492,8 @@ def run_ingestion(
         else:
             logger.info("Source %s: no file_ref, skipping text extraction", source.id)
 
-        drafts: list[ObservationDraft] = []
+        obs_drafts: list[ObservationDraft] = []
+        hyp_drafts: list[HypothesisDraft] = []
 
         if method == IngestionMethod.AI:
             if not extraction or not extraction.raw_text.strip():
@@ -384,14 +501,17 @@ def run_ingestion(
                     "AI ingestion requires extractable text. "
                     "Upload a file with readable content first."
                 )
-            logger.info("Source %s: calling Claude for observation extraction", source.id)
-            drafts = _call_claude(extraction.raw_text, source.title)
-            logger.info("Source %s: Claude returned %d observation drafts", source.id, len(drafts))
+            logger.info("Source %s: calling Claude for extraction", source.id)
+            obs_drafts, hyp_drafts = _call_claude(extraction.raw_text, source.title)
+            logger.info(
+                "Source %s: Claude returned %d observations, %d hypotheses",
+                source.id, len(obs_drafts), len(hyp_drafts),
+            )
 
         elif method == IngestionMethod.MANUAL and manual_observations:
             for item in manual_observations:
                 try:
-                    drafts.append(ObservationDraft(
+                    obs_drafts.append(ObservationDraft(
                         content=str(item["content"]).strip(),
                         content_type=ContentType(item["content_type"]),
                         source_modality=SourceModality(item["source_modality"]),
@@ -406,22 +526,30 @@ def run_ingestion(
                 except (KeyError, ValueError) as e:
                     logger.warning("Skipping malformed manual observation: %s — %s", item, e)
 
-        inserted = 0
-        if drafts:
-            inserted = _insert_observations(
+        obs_inserted = 0
+        if obs_drafts:
+            obs_inserted = _insert_observations(
                 db=db,
                 source=source,
-                drafts=drafts,
+                drafts=obs_drafts,
                 method=method,
                 reviewer=reviewer_username,
+            )
+
+        hyp_inserted = 0
+        if hyp_drafts:
+            hyp_inserted = _insert_hypotheses(
+                db=db,
+                source=source,
+                drafts=hyp_drafts,
             )
 
         source.ingestion_status = IngestionStatus.COMPLETE
         db.commit()
 
         logger.info(
-            "Source %s: ingestion complete — method=%s, observations=%d",
-            source.id, method.value, inserted,
+            "Source %s: ingestion complete — method=%s, observations=%d, hypotheses=%d",
+            source.id, method.value, obs_inserted, hyp_inserted,
         )
 
         return IngestionResult(
@@ -429,7 +557,8 @@ def run_ingestion(
             method=method,
             status=IngestionStatus.COMPLETE,
             raw_text=source.raw_text,
-            observations_inserted=inserted,
+            observations_inserted=obs_inserted,
+            hypotheses_inserted=hyp_inserted,
             ocr_pages=extraction.ocr_pages if extraction else 0,
         )
 
