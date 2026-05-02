@@ -3,7 +3,8 @@
 __pycache__
 data_sheet.xlsx
 storage/*
-
+DEPLOY.md
+TODO
 
 # Logs
 logs
