@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # CORS
-    allowed_origins=["http://localhost:3000/"]
+    allowed_origins: List[str]=["http://localhost:3000/"]
 
     model_config = {"env_file": ".env", "case_sensitive": False}
 
