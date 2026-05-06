@@ -25,7 +25,7 @@ app = FastAPI(
 origins = (
     ["*"]
     if settings.environment == "development"
-    else [f"https://{settings.allowed_origins}"]
+    else [settings.allowed_origins]
 )
 
 app.add_middleware(
