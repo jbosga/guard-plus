@@ -144,7 +144,7 @@ export function ObservationList() {
             options={ED_OPTIONS}
             placeholder="all distances"
             value={epistemicDistance}
-            onChange={e => { setEpistemicDistance(e.target.value); setPage(1); }}
+            onChange={e => { setEpistemicDistance(e.target.value as EpistemicDistance | ''); setPage(1); }}
             style={{ fontSize: 11 }}
           />
           <Select
