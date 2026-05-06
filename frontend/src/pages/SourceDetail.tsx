@@ -8,7 +8,7 @@ import {
   Page, Spinner, ErrorState, EmptyState,
   SourceTypeBadge, ProvenanceBadge, IngestionDot,
   ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
-  Button, Card, Stat, SectionHeader, Select, Input,
+  Button, Card, Stat, SectionHeader, Select,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
 

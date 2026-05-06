@@ -7,11 +7,9 @@ import {
   getFrameworks,
   getHypotheses,
   getHypothesis,
-  getObservations,
 } from '../api';
 import type {
   TheoreticalFrameworkList,
-  HypothesisList,
   HypothesisRead,
   ObservationRead,
   HypothesisFramework,
@@ -70,184 +68,9 @@ type SelectedNodeKind =
   | { kind: 'hypothesis'; hyp: HypothesisRead }
   | { kind: 'observation'; obs: ObservationRead; role: 'supporting' | 'anomalous' };
 
-// ── Build Cytoscape elements ──────────────────────────────────────────────────
-
-function buildElements(
-  data: GraphData,
-  filterFrameworkId: string,
-  anomalousOnly: boolean,
-): cytoscape.ElementDefinition[] {
-  const elements: cytoscape.ElementDefinition[] = [];
-  const obsNodeIds = new Set<string>(); // deduplicate observation nodes
-
-  const frameworks = filterFrameworkId
-    ? data.frameworks.filter(f => f.id === filterFrameworkId)
-    : data.frameworks;
-
-  const frameworkIdSet = new Set(frameworks.map(f => f.id));
-
-  // Collect hypothesis IDs that belong to selected frameworks
-  const visibleHypIds = new Set<string>();
-  data.hypotheses.forEach(h => {
-    // Always include if no framework filter; otherwise only if its framework node is visible
-    // We determine framework membership from the framework's hypothesis lists —
-    // but HypothesisList doesn't carry framework_id directly. We use the `framework`
-    // field on hypothesis (the framework TYPE enum), not the framework entity ID.
-    // Instead we look at which frameworks list this hypothesis.
-    if (!filterFrameworkId) {
-      visibleHypIds.add(h.id);
-    }
-  });
-
-  // If filtering by framework, find which hypotheses belong to it via framework read data
-  if (filterFrameworkId) {
-    data.hypotheses.forEach(h => {
-      // We don't have per-hypothesis framework_id, so we rely on framework data
-      // The HypothesisList `framework` field is the framework TYPE (neurological etc),
-      // not the entity id. Framework membership is tracked in framework join tables.
-      // We approximate: show all hypotheses that share the framework TYPE of the selected framework.
-      const fw = data.frameworks.find(f => f.id === filterFrameworkId);
-      if (fw && h.framework === fw.framework_type) {
-        visibleHypIds.add(h.id);
-      }
-    });
-  } else {
-    data.hypotheses.forEach(h => visibleHypIds.add(h.id));
-  }
-
-  // ── Framework nodes ────────────────────────────────────────────────────────
-  frameworks.forEach(fw => {
-    elements.push({
-      data: {
-        id: fw.id,
-        label: fw.label.length > 40 ? fw.label.slice(0, 38) + '…' : fw.label,
-        nodeKind: 'framework',
-        color: NODE_COLORS.framework,
-        borderColor: FRAMEWORK_TYPE_BORDER[fw.framework_type] ?? '#6b7280',
-        size: 52,
-      },
-    });
-  });
-
-  // ── Hypothesis nodes + edges ───────────────────────────────────────────────
-  data.hypotheses.forEach(hyp => {
-    if (!visibleHypIds.has(hyp.id)) return;
-
-    elements.push({
-      data: {
-        id: hyp.id,
-        label: hyp.label.length > 40 ? hyp.label.slice(0, 38) + '…' : hyp.label,
-        nodeKind: 'hypothesis',
-        color: NODE_COLORS.hypothesis,
-        borderColor: hyp.status === 'refuted' ? '#ef4444' : '#6d28d9',
-        size: 36,
-      },
-    });
-
-    // Hypothesis → Framework edges (core and anomalous)
-    // We derive these from the framework side: frameworks list core/anomalous hypothesis IDs.
-    // To avoid N+1 here we reverse-map from framework data.
-    // This is done in a second pass below.
-
-    // Observation nodes + obs → hyp edges
-    if (!anomalousOnly) {
-      hyp.supporting_observations.forEach(obs => {
-        if (!obsNodeIds.has(obs.id)) {
-          obsNodeIds.add(obs.id);
-          elements.push({
-            data: {
-              id: obs.id,
-              label: obs.content.length > 45 ? obs.content.slice(0, 43) + '…' : obs.content,
-              nodeKind: 'observation_supporting',
-              color: NODE_COLORS.observation_supporting,
-              borderColor: '#15803d',
-              size: 20,
-            },
-          });
-        }
-        elements.push({
-          data: {
-            id: `sup-${obs.id}-${hyp.id}`,
-            source: obs.id,
-            target: hyp.id,
-            color: EDGE_COLORS.obs_supports,
-            label: 'supports',
-            width: 1.5,
-            edgeKind: 'obs_supports',
-          },
-        });
-      });
-    }
-
-    hyp.anomalous_observations.forEach(obs => {
-      if (!obsNodeIds.has(obs.id)) {
-        obsNodeIds.add(obs.id);
-        elements.push({
-          data: {
-            id: obs.id,
-            label: obs.content.length > 45 ? obs.content.slice(0, 43) + '…' : obs.content,
-            nodeKind: 'observation_anomalous',
-            color: NODE_COLORS.observation_anomalous,
-            borderColor: '#991b1b',
-            size: 20,
-          },
-          classes: 'anomalous-obs',
-        });
-      }
-      elements.push({
-        data: {
-          id: `anom-${obs.id}-${hyp.id}`,
-          source: obs.id,
-          target: hyp.id,
-          color: EDGE_COLORS.obs_challenges,
-          label: '⚠ challenges',
-          width: 2,
-          edgeKind: 'obs_challenges',
-        },
-        classes: 'anomalous-edge',
-      });
-    });
-
-    // Competing hypothesis edges
-    if (!anomalousOnly) {
-      hyp.competing_hypotheses.forEach(comp => {
-        if (!visibleHypIds.has(comp.id)) return;
-        // Emit only one edge per pair (use sorted IDs)
-        const edgeId = [hyp.id, comp.id].sort().join('-comp-');
-        const alreadyAdded = elements.some(el => el.data?.id === edgeId);
-        if (!alreadyAdded) {
-          elements.push({
-            data: {
-              id: edgeId,
-              source: hyp.id,
-              target: comp.id,
-              color: EDGE_COLORS.hyp_competitor,
-              label: 'competes',
-              width: 1.5,
-              edgeKind: 'hyp_competitor',
-            },
-          });
-        }
-      });
-    }
-  });
-
-  // ── Framework ↔ Hypothesis edges (reverse-map from framework data) ─────────
-  // We need TheoreticalFrameworkRead to get core/anomalous hypothesis IDs,
-  // but we only have TheoreticalFrameworkList here. We approximate using
-  // the hypothesis's `framework` field (framework type enum) to connect
-  // each hypothesis to its matching framework node. This is a reasonable
-  // approximation — the proper solution is to pass framework reads.
-  // For now, mark all as 'core' unless they appear in anomalous_hypotheses
-  // (which requires framework read data, passed separately).
-  // See note in code: pass `frameworkHypEdges` from caller for precision.
-
-  return elements;
-}
-
 // ── Cytoscape stylesheet ──────────────────────────────────────────────────────
 
-function buildStylesheet(): cytoscape.Stylesheet[] {
+function buildStylesheet(): cytoscape.StylesheetCSS[] {
   return [
     {
       selector: 'node',
@@ -267,7 +90,7 @@ function buildStylesheet(): cytoscape.Stylesheet[] {
         'border-width': 2.5,
         'border-color': 'data(borderColor)',
         'transition-property': 'border-color border-width opacity',
-        'transition-duration': '150ms',
+        'transition-duration': 150,
       } as cytoscape.Css.Node,
     },
     {
@@ -275,7 +98,7 @@ function buildStylesheet(): cytoscape.Stylesheet[] {
       style: {
         'shape': 'hexagon',
         'font-size': '10px',
-        'font-weight': '700',
+        'font-weight': 700,
         'text-max-width': '130px',
         'color': '#0550ae',
       } as cytoscape.Css.Node,
@@ -331,7 +154,7 @@ function buildStylesheet(): cytoscape.Stylesheet[] {
         'text-margin-y': -5,
         'opacity': 0.8,
         'transition-property': 'opacity',
-        'transition-duration': '150ms',
+        'transition-duration': 150,
       } as cytoscape.Css.Edge,
     },
     {
@@ -807,8 +630,6 @@ export function GraphView() {
         },
       });
     });
-
-    const visibleFwIds = new Set(visibleFrameworks.map(f => f.id));
 
     // Determine which hypotheses to show
     const visibleHyps = filterFrameworkId

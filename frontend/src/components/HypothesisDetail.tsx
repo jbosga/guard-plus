@@ -12,7 +12,7 @@ import {
   Page, Spinner, ErrorState, EmptyState,
   Badge, ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
   HypothesisStatusBadge, HypothesisTypeBadge, ConfidenceBadge,
-  Button, Card, SectionHeader, Select, Input,
+  Button, Card, Select, Input,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
 

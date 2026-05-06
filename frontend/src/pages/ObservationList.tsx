@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getObservations, updateObservation } from '../api';
-import type { ObservationEpistemicStatus, ContentType } from '../types';
+import type { ObservationEpistemicStatus, ContentType, EpistemicDistance } from '../types';
 import {
   Page, Spinner, ErrorState, EmptyState, Pagination,
   ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
@@ -50,7 +50,7 @@ export function ObservationList() {
   const [search, setSearch] = useState('');
   const [epistemicStatus, setEpistemicStatus] = useState<ObservationEpistemicStatus | ''>('');
   const [contentType, setContentType] = useState<ContentType | ''>('');
-  const [epistemicDistance, setEpistemicDistance] = useState('');
+  const [epistemicDistance, setEpistemicDistance] = useState<EpistemicDistance | ''>('');
   const [collectionMethod, setCollectionMethod] = useState('');
   const [aiExtracted, setAiExtracted] = useState<'' | 'true' | 'false'>('');
   const [unreviewed, setUnreviewed] = useState(false);

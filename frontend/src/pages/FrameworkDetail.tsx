@@ -7,7 +7,7 @@ import {
   Page, Spinner, ErrorState, EmptyState,
   Badge, FrameworkStatusBadge, ConfidenceBadge,
   HypothesisTypeBadge, HypothesisStatusBadge,
-  Button, Card, SectionHeader, Select, Input,
+  Button, Card, Select, Input,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
 
