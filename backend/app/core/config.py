@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Runtime
     environment: str = "development"
 
+    # CORS
+    allowed_origins=["http://localhost:3000/"]
+
     model_config = {"env_file": ".env", "case_sensitive": False}
 
 
