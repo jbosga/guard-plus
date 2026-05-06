@@ -55,11 +55,11 @@ const EDGE_COLORS = {
 
 // ── Graph data types ──────────────────────────────────────────────────────────
 
-interface GraphData {
-  frameworks: TheoreticalFrameworkList[];
-  hypotheses: HypothesisRead[];
-  // observations are embedded in hypothesisReads
-}
+// interface GraphData {
+//   frameworks: TheoreticalFrameworkList[];
+//   hypotheses: HypothesisRead[];
+//   // observations are embedded in hypothesisReads
+// }
 
 // ── Detail panel types ────────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ type SelectedNodeKind =
 
 // ── Cytoscape stylesheet ──────────────────────────────────────────────────────
 
-function buildStylesheet(): cytoscape.StylesheetCSS[] {
+function buildStylesheet(): cytoscape.StylesheetStyle[] {
   return [
     {
       selector: 'node',
