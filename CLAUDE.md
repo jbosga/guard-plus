@@ -242,8 +242,8 @@ Accept / reject with optional field edits
 | **Phase D** | Backend: Case CRUD API routes + export endpoint | ✅ Done |
 | **Phase E** | Backend: AI ingestion for cases (CaseDraft, case review queue) | ✅ Done |
 | **Phase F** | Frontend: CaseList, CaseDetail, CaseReviewQueue, export | ✅ Done |
-| **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ⬜ Next |
-| **Phase H** | Cleanup: remove dead code, update design principles, smoke test | ⬜ |
+| **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ✅ Done |
+| **Phase H** | Cleanup: remove dead code, update design principles, smoke test | ⬜ Next |
 
 ---
 
