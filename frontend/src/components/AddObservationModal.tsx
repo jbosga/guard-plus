@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { createObservation } from '../api';
-import type {
-  ObservationEpistemicStatus, ContentType, SourceModality,
-  EpistemicDistance, CollectionMethod, SampleSizeTier, SamplingMethod,
-} from '../types';
+import type { ObservationEpistemicStatus, ObservationSourceType, CasesIncluded } from '../types';
 import { Button, Input, Select } from './ui';
 
 interface Props {
-  sourceId: string;
+  sourceId?: string;
+  defaultSourceType?: ObservationSourceType;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -20,106 +18,68 @@ const EPISTEMIC_OPTIONS = [
   { value: 'retracted',    label: 'Retracted' },
 ];
 
-const CONTENT_TYPE_OPTIONS = [
-  { value: 'experiential',      label: 'Experiential' },
-  { value: 'behavioral',        label: 'Behavioral' },
-  { value: 'physiological',     label: 'Physiological' },
-  { value: 'environmental',     label: 'Environmental' },
-  { value: 'testimonial',       label: 'Testimonial' },
-  { value: 'documentary_trace', label: 'Documentary trace' },
+const CASES_INCLUDED_OPTIONS = [
+  { value: 'all',             label: 'All cases' },
+  { value: 'filtered_subset', label: 'Filtered subset' },
 ];
 
-const SOURCE_MODALITY_OPTIONS = [
-  { value: 'first_person_verbal',    label: 'First-person verbal' },
-  { value: 'investigator_summary',   label: 'Investigator summary' },
-  { value: 'physiological',          label: 'Physiological' },
-  { value: 'behavioral',             label: 'Behavioral' },
-  { value: 'documentary',            label: 'Documentary' },
-  { value: 'aggregate_statistical',  label: 'Aggregate / statistical' },
-];
+const labelStyle: React.CSSProperties = {
+  fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+  color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
+};
 
-const EPISTEMIC_DISTANCE_OPTIONS = [
-  { value: 'direct',      label: 'Direct' },
-  { value: 'summarized',  label: 'Summarized' },
-  { value: 'aggregated',  label: 'Aggregated' },
-  { value: 'derived',     label: 'Derived' },
-];
+export function AddObservationModal({ sourceId, defaultSourceType = 'literature', onClose, onCreated }: Props) {
+  const [sourceType, setSourceType] = useState<ObservationSourceType>(defaultSourceType);
+  const locked = sourceId != null;
 
-const COLLECTION_METHOD_OPTIONS = [
-  { value: 'spontaneous_report',    label: 'Spontaneous report' },
-  { value: 'structured_interview',  label: 'Structured interview' },
-  { value: 'hypnotic_regression',   label: 'Hypnotic regression' },
-  { value: 'questionnaire',         label: 'Questionnaire' },
-  { value: 'clinical_assessment',   label: 'Clinical assessment' },
-  { value: 'passive_recording',     label: 'Passive recording' },
-  { value: 'investigator_inference',label: 'Investigator inference' },
-];
+  const [content, setContent] = useState('');
+  const [epistemicStatus, setEpistemicStatus] = useState<ObservationEpistemicStatus>('reported');
+  const [authoredBy, setAuthoredBy] = useState('');
+  const [verbatim, setVerbatim] = useState(false);
+  const [pageRef, setPageRef] = useState('');
 
-const SAMPLE_TIER_OPTIONS = [
-  { value: 'single_case', label: 'Single case' },
-  { value: 'small',       label: 'Small' },
-  { value: 'moderate',    label: 'Moderate' },
-  { value: 'large',       label: 'Large' },
-  { value: 'population',  label: 'Population' },
-];
+  // corpus-derived fields
+  const [queryDefinition, setQueryDefinition] = useState('');
+  const [analysisTool, setAnalysisTool] = useState('');
+  const [snapshotDate, setSnapshotDate] = useState('');
+  const [caseCount, setCaseCount] = useState('');
+  const [casesIncluded, setCasesIncluded] = useState<CasesIncluded>('all');
+  const [filterDescription, setFilterDescription] = useState('');
 
-const SAMPLING_METHOD_OPTIONS = [
-  { value: 'self_selected',         label: 'Self-selected' },
-  { value: 'investigator_referred', label: 'Investigator referred' },
-  { value: 'clinical',              label: 'Clinical' },
-  { value: 'survey',                label: 'Survey' },
-  { value: 'convenience',           label: 'Convenience' },
-  { value: 'unknown',               label: 'Unknown' },
-];
-
-export function AddObservationModal({ sourceId, onClose, onCreated }: Props) {
-  const [form, setForm] = useState({
-    content: '',
-    content_type: 'experiential' as ContentType,
-    source_modality: 'first_person_verbal' as SourceModality,
-    epistemic_distance: 'direct' as EpistemicDistance,
-    collection_method: 'spontaneous_report' as CollectionMethod,
-    epistemic_status: 'reported' as ObservationEpistemicStatus,
-    verbatim: false,
-    page_ref: '',
-  });
-  const [aggregateForm, setAggregateForm] = useState({
-    sample_n: '',
-    sample_size_tier: '' as SampleSizeTier | '',
-    sampling_method: '' as SamplingMethod | '',
-    inclusion_criteria_documented: false,
-  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const isAggregate = form.epistemic_distance === 'aggregated';
-
-  function set(field: string, value: string | boolean) {
-    setForm(f => ({ ...f, [field]: value }));
-  }
+  const isCorpusDerived = sourceType === 'corpus_derived';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.content.trim()) return;
+    if (!content.trim()) return;
+    if (isCorpusDerived && (!queryDefinition.trim() || !snapshotDate || !caseCount)) return;
+
     setLoading(true);
     setError('');
     try {
       await createObservation({
-        source_id:          sourceId,
-        content:            form.content.trim(),
-        content_type:       form.content_type,
-        source_modality:    form.source_modality,
-        epistemic_distance: form.epistemic_distance,
-        collection_method:  form.collection_method,
-        epistemic_status:   form.epistemic_status,
-        verbatim:           form.verbatim,
-        page_ref:           form.page_ref || undefined,
-        ...(isAggregate && {
-          sample_n: aggregateForm.sample_n ? parseInt(aggregateForm.sample_n, 10) : undefined,
-          sample_size_tier: aggregateForm.sample_size_tier || undefined,
-          sampling_method: aggregateForm.sampling_method || undefined,
-          inclusion_criteria_documented: aggregateForm.inclusion_criteria_documented || undefined,
-        }),
+        observation_source_type: sourceType,
+        content: content.trim(),
+        epistemic_status: epistemicStatus,
+        authored_by: authoredBy.trim() || undefined,
+        ...(isCorpusDerived
+          ? {
+              source_id: undefined,
+              query_definition: queryDefinition.trim(),
+              analysis_tool: analysisTool.trim() || undefined,
+              corpus_snapshot_date: snapshotDate,
+              case_count_at_snapshot: parseInt(caseCount, 10),
+              cases_included: casesIncluded,
+              case_filter_description: casesIncluded === 'filtered_subset' ? filterDescription.trim() || undefined : undefined,
+            }
+          : {
+              source_id: sourceId,
+              verbatim,
+              page_ref: pageRef.trim() || undefined,
+            }
+        ),
       });
       onCreated();
     } catch {
@@ -128,6 +88,9 @@ export function AddObservationModal({ sourceId, onClose, onCreated }: Props) {
       setLoading(false);
     }
   }
+
+  const canSubmit = content.trim() &&
+    (!isCorpusDerived || (queryDefinition.trim() && snapshotDate && caseCount));
 
   return (
     <div
@@ -143,7 +106,7 @@ export function AddObservationModal({ sourceId, onClose, onCreated }: Props) {
         background: 'var(--bg-1)',
         border: '1px solid var(--border-mid)',
         borderRadius: 4,
-        width: 600,
+        width: 620,
         maxHeight: '90vh',
         overflow: 'auto',
         padding: 'var(--space-5)',
@@ -165,17 +128,39 @@ export function AddObservationModal({ sourceId, onClose, onCreated }: Props) {
           }}>×</button>
         </div>
 
+        {/* Source type toggle — hidden when sourceId is pre-filled (context is unambiguous) */}
+        {!locked && <div style={{
+          display: 'flex', gap: 2, marginBottom: 'var(--space-5)',
+          border: '1px solid var(--border-dim)', borderRadius: 'var(--radius-md)',
+          overflow: 'hidden', width: 'fit-content',
+        }}>
+          {(['literature', 'corpus_derived'] as ObservationSourceType[]).map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setSourceType(t)}
+              style={{
+                background: sourceType === t ? 'var(--accent)' : 'transparent',
+                color: sourceType === t ? '#fff' : 'var(--text-dim)',
+                border: 'none', cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                letterSpacing: '0.06em', padding: '5px 14px',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              {t === 'literature' ? 'Literature' : 'Corpus-derived'}
+            </button>
+          ))}
+        </div>}
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+
+          {/* Content */}
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{
-              fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-              color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
-            }}>
-              Content *
-            </span>
+            <span style={labelStyle}>Content *</span>
             <textarea
-              value={form.content}
-              onChange={e => set('content', e.target.value)}
+              value={content}
+              onChange={e => setContent(e.target.value)}
               rows={4}
               autoFocus
               required
@@ -183,127 +168,124 @@ export function AddObservationModal({ sourceId, onClose, onCreated }: Props) {
                 background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
                 borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '6px 10px',
                 fontSize: 13, outline: 'none', resize: 'vertical',
-                fontFamily: form.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
+                fontFamily: verbatim && !isCorpusDerived ? 'var(--font-mono)' : 'var(--font-sans)',
               }}
             />
           </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <Select
-              label="Content type *"
-              options={CONTENT_TYPE_OPTIONS}
-              value={form.content_type}
-              onChange={e => set('content_type', e.target.value)}
+              label="Epistemic status"
+              options={EPISTEMIC_OPTIONS}
+              value={epistemicStatus}
+              onChange={e => setEpistemicStatus(e.target.value as ObservationEpistemicStatus)}
             />
-            <Select
-              label="Source modality *"
-              options={SOURCE_MODALITY_OPTIONS}
-              value={form.source_modality}
-              onChange={e => set('source_modality', e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-            <Select
-              label="Epistemic distance *"
-              options={EPISTEMIC_DISTANCE_OPTIONS}
-              value={form.epistemic_distance}
-              onChange={e => set('epistemic_distance', e.target.value)}
-            />
-            <Select
-              label="Collection method *"
-              options={COLLECTION_METHOD_OPTIONS}
-              value={form.collection_method}
-              onChange={e => set('collection_method', e.target.value)}
+            <Input
+              label="Authored by"
+              value={authoredBy}
+              onChange={e => setAuthoredBy(e.target.value)}
+              placeholder="researcher name"
             />
           </div>
 
-          <Select
-            label="Epistemic status"
-            options={EPISTEMIC_OPTIONS}
-            value={form.epistemic_status}
-            onChange={e => set('epistemic_status', e.target.value)}
-          />
+          {/* Literature-only fields */}
+          {!isCorpusDerived && (
+            <>
+              <Input
+                label="Page ref"
+                value={pageRef}
+                onChange={e => setPageRef(e.target.value)}
+                placeholder="42"
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={verbatim}
+                  onChange={e => setVerbatim(e.target.checked)}
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)', letterSpacing: '0.04em' }}>
+                  verbatim quote
+                </span>
+              </label>
+            </>
+          )}
 
-          {/* Aggregate fields — shown only when epistemic_distance = aggregated */}
-          {isAggregate && (
+          {/* Corpus-derived fields */}
+          {isCorpusDerived && (
             <div style={{
-              padding: 'var(--space-3)',
+              padding: 'var(--space-4)',
               border: '1px solid var(--border-dim)',
               borderRadius: 'var(--radius-md)',
               display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
             }}>
-              <span style={{
-                fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
-                color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
-              }}>
-                Aggregate study metadata
-              </span>
+              <span style={labelStyle}>Corpus-derived provenance</span>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={labelStyle}>Query / procedure *</span>
+                <textarea
+                  value={queryDefinition}
+                  onChange={e => setQueryDefinition(e.target.value)}
+                  rows={3}
+                  required
+                  placeholder="Describe the code or procedure used to produce this result…"
+                  style={{
+                    background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
+                    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '6px 10px',
+                    fontSize: 13, outline: 'none', resize: 'vertical',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                />
+              </label>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
                 <Input
-                  label="Sample n"
+                  label="Analysis tool"
+                  value={analysisTool}
+                  onChange={e => setAnalysisTool(e.target.value)}
+                  placeholder="Python/pandas"
+                />
+                <Input
+                  label="Snapshot date *"
+                  type="date"
+                  value={snapshotDate}
+                  onChange={e => setSnapshotDate(e.target.value)}
+                />
+                <Input
+                  label="Case count at snapshot *"
                   type="number"
-                  value={aggregateForm.sample_n}
-                  onChange={e => setAggregateForm(f => ({ ...f, sample_n: e.target.value }))}
-                  placeholder="e.g. 150"
-                />
-                <Select
-                  label="Size tier"
-                  options={SAMPLE_TIER_OPTIONS}
-                  placeholder="— none —"
-                  value={aggregateForm.sample_size_tier}
-                  onChange={e => setAggregateForm(f => ({ ...f, sample_size_tier: e.target.value as SampleSizeTier | '' }))}
-                />
-                <Select
-                  label="Sampling method"
-                  options={SAMPLING_METHOD_OPTIONS}
-                  placeholder="— none —"
-                  value={aggregateForm.sampling_method}
-                  onChange={e => setAggregateForm(f => ({ ...f, sampling_method: e.target.value as SamplingMethod | '' }))}
+                  min="0"
+                  value={caseCount}
+                  onChange={e => setCaseCount(e.target.value)}
+                  placeholder="0"
                 />
               </div>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={aggregateForm.inclusion_criteria_documented}
-                  onChange={e => setAggregateForm(f => ({ ...f, inclusion_criteria_documented: e.target.checked }))}
-                  style={{ accentColor: 'var(--accent)' }}
-                />
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 11,
-                  color: 'var(--text-secondary)', letterSpacing: '0.04em',
-                }}>
-                  inclusion criteria documented
-                </span>
-              </label>
+
+              <Select
+                label="Cases included"
+                options={CASES_INCLUDED_OPTIONS}
+                value={casesIncluded}
+                onChange={e => setCasesIncluded(e.target.value as CasesIncluded)}
+              />
+
+              {casesIncluded === 'filtered_subset' && (
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={labelStyle}>Filter description</span>
+                  <textarea
+                    value={filterDescription}
+                    onChange={e => setFilterDescription(e.target.value)}
+                    rows={2}
+                    placeholder="Describe the filters applied to the case corpus…"
+                    style={{
+                      background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
+                      borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '6px 10px',
+                      fontSize: 13, outline: 'none', resize: 'vertical',
+                    }}
+                  />
+                </label>
+              )}
             </div>
           )}
-
-          <Input
-            label="Page ref"
-            value={form.page_ref}
-            onChange={e => set('page_ref', e.target.value)}
-            placeholder="42"
-          />
-
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer',
-          }}>
-            <input
-              type="checkbox"
-              checked={form.verbatim}
-              onChange={e => set('verbatim', e.target.checked)}
-              style={{ accentColor: 'var(--accent)' }}
-            />
-            <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11,
-              color: 'var(--text-secondary)', letterSpacing: '0.04em',
-            }}>
-              verbatim quote
-            </span>
-          </label>
 
           {error && (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--status-error)' }}>
@@ -313,7 +295,7 @@ export function AddObservationModal({ sourceId, onClose, onCreated }: Props) {
 
           <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
             <Button type="button" variant="ghost" onClick={onClose}>cancel</Button>
-            <Button type="submit" variant="primary" disabled={loading || !form.content.trim()}>
+            <Button type="submit" variant="primary" disabled={loading || !canSubmit}>
               {loading ? 'saving…' : 'add observation'}
             </Button>
           </div>

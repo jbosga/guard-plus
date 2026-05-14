@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getObservations, updateObservation } from '../api';
-import type { ObservationEpistemicStatus, ContentType, EpistemicDistance } from '../types';
+import type { ObservationEpistemicStatus, ObservationSourceType } from '../types';
 import {
   Page, Spinner, ErrorState, EmptyState, Pagination,
-  ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
+  ObservationEpistemicBadge,
   Button, Select,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
+import { AddObservationModal } from '../components/AddObservationModal';
 
 const EP_OPTIONS: { value: ObservationEpistemicStatus; label: string }[] = [
   { value: 'reported',     label: 'Reported' },
@@ -18,30 +19,9 @@ const EP_OPTIONS: { value: ObservationEpistemicStatus; label: string }[] = [
   { value: 'retracted',    label: 'Retracted' },
 ];
 
-const CT_OPTIONS: { value: ContentType; label: string }[] = [
-  { value: 'experiential',      label: 'Experiential' },
-  { value: 'behavioral',        label: 'Behavioral' },
-  { value: 'physiological',     label: 'Physiological' },
-  { value: 'environmental',     label: 'Environmental' },
-  { value: 'testimonial',       label: 'Testimonial' },
-  { value: 'documentary_trace', label: 'Documentary trace' },
-];
-
-const ED_OPTIONS = [
-  { value: 'direct',      label: 'Direct' },
-  { value: 'summarized',  label: 'Summarized' },
-  { value: 'aggregated',  label: 'Aggregated' },
-  { value: 'derived',     label: 'Derived' },
-];
-
-const CM_OPTIONS = [
-  { value: 'spontaneous_report',    label: 'Spontaneous report' },
-  { value: 'structured_interview',  label: 'Structured interview' },
-  { value: 'hypnotic_regression',   label: 'Hypnotic regression' },
-  { value: 'questionnaire',         label: 'Questionnaire' },
-  { value: 'clinical_assessment',   label: 'Clinical assessment' },
-  { value: 'passive_recording',     label: 'Passive recording' },
-  { value: 'investigator_inference',label: 'Investigator inference' },
+const SOURCE_TYPE_OPTIONS: { value: ObservationSourceType; label: string }[] = [
+  { value: 'literature',      label: 'Literature' },
+  { value: 'corpus_derived',  label: 'Corpus-derived' },
 ];
 
 export function ObservationList() {
@@ -49,12 +29,11 @@ export function ObservationList() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [epistemicStatus, setEpistemicStatus] = useState<ObservationEpistemicStatus | ''>('');
-  const [contentType, setContentType] = useState<ContentType | ''>('');
-  const [epistemicDistance, setEpistemicDistance] = useState<EpistemicDistance | ''>('');
-  const [collectionMethod, setCollectionMethod] = useState('');
+  const [observationSourceType, setObservationSourceType] = useState<ObservationSourceType | ''>('');
   const [aiExtracted, setAiExtracted] = useState<'' | 'true' | 'false'>('');
   const [unreviewed, setUnreviewed] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
 
   const qc = useQueryClient();
 
@@ -63,9 +42,7 @@ export function ObservationList() {
     page_size: 50,
     ...(search && { search }),
     ...(epistemicStatus && { epistemic_status: epistemicStatus }),
-    ...(contentType && { content_type: contentType }),
-    ...(epistemicDistance && { epistemic_distance: epistemicDistance }),
-    ...(collectionMethod && { collection_method: collectionMethod }),
+    ...(observationSourceType && { observation_source_type: observationSourceType }),
     ...(aiExtracted !== '' && { ai_extracted: aiExtracted === 'true' }),
     ...(unreviewed && { unreviewed: true }),
   };
@@ -76,7 +53,7 @@ export function ObservationList() {
   });
 
   const mutation = useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; epistemic_status?: ObservationEpistemicStatus; content_type?: ContentType }) =>
+    mutationFn: ({ id, ...payload }: { id: string; epistemic_status?: ObservationEpistemicStatus }) =>
       updateObservation(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['observations'] });
@@ -92,19 +69,23 @@ export function ObservationList() {
 
   function reset() {
     setSearch(''); setSearchInput('');
-    setEpistemicStatus(''); setContentType('');
-    setEpistemicDistance(''); setCollectionMethod('');
+    setEpistemicStatus(''); setObservationSourceType('');
     setAiExtracted(''); setUnreviewed(false);
     setPage(1);
   }
 
-  const hasFilters = search || epistemicStatus || contentType || epistemicDistance || collectionMethod || aiExtracted || unreviewed;
+  const hasFilters = search || epistemicStatus || observationSourceType || aiExtracted || unreviewed;
 
   return (
     <Shell>
       <Page
         title="Observations"
         subtitle={data ? `${data.total} observations in corpus` : undefined}
+        actions={
+          <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
+            + add observation
+          </Button>
+        }
       >
         {/* Filter bar */}
         <div style={{
@@ -134,24 +115,10 @@ export function ObservationList() {
             style={{ fontSize: 11 }}
           />
           <Select
-            options={CT_OPTIONS}
-            placeholder="all content types"
-            value={contentType}
-            onChange={e => { setContentType(e.target.value as ContentType | ''); setPage(1); }}
-            style={{ fontSize: 11 }}
-          />
-          <Select
-            options={ED_OPTIONS}
-            placeholder="all distances"
-            value={epistemicDistance}
-            onChange={e => { setEpistemicDistance(e.target.value as EpistemicDistance | ''); setPage(1); }}
-            style={{ fontSize: 11 }}
-          />
-          <Select
-            options={CM_OPTIONS}
-            placeholder="all methods"
-            value={collectionMethod}
-            onChange={e => { setCollectionMethod(e.target.value); setPage(1); }}
+            options={SOURCE_TYPE_OPTIONS}
+            placeholder="all source types"
+            value={observationSourceType}
+            onChange={e => { setObservationSourceType(e.target.value as ObservationSourceType | ''); setPage(1); }}
             style={{ fontSize: 11 }}
           />
           <Select
@@ -223,23 +190,46 @@ export function ObservationList() {
                       marginBottom: 'var(--space-2)', flexWrap: 'wrap',
                     }}>
                       <ObservationEpistemicBadge status={obs.epistemic_status} />
-                      <ContentTypeBadge type={obs.content_type} />
-                      <CollectionMethodBadge method={obs.collection_method} />
-                      {obs.epistemic_distance === 'aggregated' && obs.sample_n != null && (
+
+                      {obs.observation_source_type === 'corpus_derived' && (
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 10,
-                          color: 'var(--text-dim)',
-                          border: '1px solid var(--border-dim)',
-                          padding: '1px 6px', borderRadius: 20,
+                          color: 'var(--accent)',
+                          border: '1px solid var(--accent)44',
+                          padding: '1px 7px', borderRadius: 20,
                         }}>
-                          n={obs.sample_n}
+                          corpus-derived
                         </span>
                       )}
+
+                      {obs.staleness_flag && (
+                        <span
+                          title={`Computed against ${obs.case_count_at_snapshot} cases; corpus may have grown since ${obs.corpus_snapshot_date}`}
+                          style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 10,
+                            color: 'var(--status-warn)',
+                            background: 'var(--status-warn-bg)',
+                            border: '1px solid var(--status-warn)44',
+                            padding: '1px 7px', borderRadius: 20,
+                            cursor: 'help',
+                          }}
+                        >
+                          ⚠ stale
+                        </span>
+                      )}
+
                       {obs.page_ref && (
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
                           p.{obs.page_ref}
                         </span>
                       )}
+
+                      {obs.authored_by && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
+                          {obs.authored_by}
+                        </span>
+                      )}
+
                       {obs.ai_extracted && !obs.reviewed_at && (
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 10,
@@ -251,6 +241,7 @@ export function ObservationList() {
                           unreviewed
                         </span>
                       )}
+
                       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                         <button
                           onClick={() => setEditingId(obs.id)}
@@ -265,12 +256,14 @@ export function ObservationList() {
                         >
                           edit
                         </button>
-                        <Link
-                          to={`/sources/${obs.source_id}`}
-                          style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}
-                        >
-                          → source
-                        </Link>
+                        {obs.source_id && (
+                          <Link
+                            to={`/sources/${obs.source_id}`}
+                            style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}
+                          >
+                            → source
+                          </Link>
+                        )}
                       </div>
                     </div>
 
@@ -285,7 +278,7 @@ export function ObservationList() {
                       {obs.content}
                     </p>
 
-                    {/* Source title */}
+                    {/* Source title or corpus-derived provenance */}
                     {obs.source_title && (
                       <div style={{
                         marginTop: 'var(--space-1)',
@@ -293,6 +286,15 @@ export function ObservationList() {
                         color: 'var(--text-dim)',
                       }}>
                         {obs.source_title}
+                      </div>
+                    )}
+                    {obs.observation_source_type === 'corpus_derived' && obs.analysis_tool && (
+                      <div style={{
+                        marginTop: 'var(--space-1)',
+                        fontFamily: 'var(--font-mono)', fontSize: 10,
+                        color: 'var(--text-dim)',
+                      }}>
+                        {obs.analysis_tool} · {obs.corpus_snapshot_date} · n={obs.case_count_at_snapshot}
                       </div>
                     )}
 
@@ -324,6 +326,17 @@ export function ObservationList() {
           </>
         )}
       </Page>
+
+      {showAdd && (
+        <AddObservationModal
+          defaultSourceType="corpus_derived"
+          onClose={() => setShowAdd(false)}
+          onCreated={() => {
+            setShowAdd(false);
+            qc.invalidateQueries({ queryKey: ['observations'] });
+          }}
+        />
+      )}
     </Shell>
   );
 }
@@ -335,20 +348,18 @@ interface ObsEditRowProps {
     id: string;
     content: string;
     epistemic_status: ObservationEpistemicStatus;
-    content_type: ContentType;
     verbatim: boolean;
     page_ref: string | null;
-    source_id: string;
+    source_id: string | null;
   };
   index: number;
   busy: boolean;
-  onSave: (payload: { epistemic_status: ObservationEpistemicStatus; content_type: ContentType }) => void;
+  onSave: (payload: { epistemic_status: ObservationEpistemicStatus }) => void;
   onCancel: () => void;
 }
 
 function ObsEditRow({ obs, index, busy, onSave, onCancel }: ObsEditRowProps) {
   const [epistemicStatus, setEpistemicStatus] = useState<ObservationEpistemicStatus>(obs.epistemic_status);
-  const [contentType, setContentType] = useState<ContentType>(obs.content_type);
 
   return (
     <div
@@ -369,23 +380,19 @@ function ObsEditRow({ obs, index, busy, onSave, onCancel }: ObsEditRowProps) {
           onChange={e => setEpistemicStatus(e.target.value as ObservationEpistemicStatus)}
           style={{ fontSize: 11 }}
         />
-        <Select
-          options={CT_OPTIONS}
-          value={contentType}
-          onChange={e => setContentType(e.target.value as ContentType)}
-          style={{ fontSize: 11 }}
-        />
         {obs.page_ref && (
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
             p.{obs.page_ref}
           </span>
         )}
-        <Link
-          to={`/sources/${obs.source_id}`}
-          style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}
-        >
-          → source
-        </Link>
+        {obs.source_id && (
+          <Link
+            to={`/sources/${obs.source_id}`}
+            style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}
+          >
+            → source
+          </Link>
+        )}
       </div>
 
       <p style={{
@@ -404,7 +411,7 @@ function ObsEditRow({ obs, index, busy, onSave, onCancel }: ObsEditRowProps) {
           size="sm"
           variant="primary"
           disabled={busy}
-          onClick={() => onSave({ epistemic_status: epistemicStatus, content_type: contentType })}
+          onClick={() => onSave({ epistemic_status: epistemicStatus })}
         >
           save
         </Button>
