@@ -241,8 +241,8 @@ Accept / reject with optional field edits
 | **Phase C** | Backend: source-type schema refactor, Case model, v2 migration | ✅ Done |
 | **Phase D** | Backend: Case CRUD API routes + export endpoint | ✅ Done |
 | **Phase E** | Backend: AI ingestion for cases (CaseDraft, case review queue) | ✅ Done |
-| **Phase F** | Frontend: CaseList, CaseDetail, CaseReviewQueue, export | ⬜ Next |
-| **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ⬜ |
+| **Phase F** | Frontend: CaseList, CaseDetail, CaseReviewQueue, export | ✅ Done |
+| **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ⬜ Next |
 | **Phase H** | Cleanup: remove dead code, update design principles, smoke test | ⬜ |
 
 ---
@@ -317,6 +317,20 @@ Accept / reject with optional field edits
 - `backend/app/api/routes/cases.py`: `GET/POST /cases`, `GET/PATCH/DELETE /cases/{id}`, `GET /sources/{id}/cases`; filter params: `source_id`, `entity_presence`, `sleep_wake_state_at_onset`, `paralysis_reported`, `hypnosis_used`, `corroboration_level`, `repeat_experiencer`, `q`
 - `backend/app/api/routes/export.py`: `GET /cases/export`; same filter params; CSV with pipe-separated JSONB arrays; `StreamingResponse`; `X-Corpus-Snapshot-Date` and `X-Case-Count` response headers
 - `backend/app/main.py`: registered `cases` and `export` routers; export router mounted before cases to avoid `/{id}` shadowing `/export`
+
+### Phase F — Frontend: Case browsing, review, and export
+- `src/types/index.ts`: updated `SourceType` to v2 values (`case_report`, `empirical_study`, `review_paper`, `theoretical`); added all case-layer enum types and `CaseList`/`CaseRead`/`CaseCreate`/`CaseUpdate`/`CaseReview` interfaces; legacy observation types retained for backward compat
+- `src/api/index.ts`: added `getCases`, `getCase`, `createCase`, `updateCase`, `deleteCase`, `getSourceCases`, `getCaseReviewQueue`, `reviewCase`, `exportCases` (returns blob + response headers for provenance)
+- `src/components/ui.tsx`: updated `SourceTypeBadge` for v2 source types with colour coding; added `ExtractionMethodBadge`, `CorroborationBadge`, `PresenceBadge`
+- `src/components/Shell.tsx`: added Cases (`/cases`) and Case Review (`/cases/review`) nav entries with correct active-state logic
+- `src/App.tsx`: added routes for `/cases`, `/cases/review`, `/cases/:id`
+- `src/components/AddCaseModal.tsx`: minimal creation modal (case label, source selector filtered to case_report sources, extraction method); navigates to CaseDetail on create
+- `src/pages/CaseList.tsx`: paginated case table with filter bar (entity presence, sleep/wake, paralysis, corroboration, hypnosis, repeat experiencer, free text); export CSV button with confirmation modal showing case count
+- `src/pages/CaseDetail.tsx`: all 10 sections (~100 fields) rendered read-only; section-level inline editing with save/cancel; multi-select enum fields as toggle chip groups; delete with confirmation; sidebar with review status, key fields, and provenance
+- `src/pages/CaseReviewQueue.tsx`: full-field review cards for AI-extracted drafts; accept (marks reviewed) / reject (deletes draft); "open for editing" link to CaseDetail
+- `src/components/AddSourceModal.tsx`: updated TYPE_OPTIONS to v2 source types
+- `src/pages/SourceList.tsx`: updated type filter options; conditional items column (cases vs. observations)
+- `src/pages/SourceDetail.tsx`: case_report sources show Cases section + Add Case + review queue link; other source types unchanged; conditional ingestion post-action links
 
 ### Phase E — Backend: AI ingestion for cases
 - `backend/app/models/corpus.py`: added `reviewed` (bool, default false), `reviewed_by`, `reviewed_at` to `Case` ORM model and `CaseList`/`CaseRead` Pydantic schemas; added `CaseReview` schema (`accepted: bool`, `edits: Optional[CaseUpdate]`)
