@@ -239,9 +239,9 @@ Accept / reject with optional field edits
 | **Phase A** | Backend data model refactor: Claim→Observation, Hypothesis→{Hypothesis,TheoreticalFramework} | ✅ Done |
 | **Phase B** | Frontend refactor: Claim→Observation, new Hypothesis/Framework types, FrameworkList/FrameworkDetail | ✅ Done |
 | **Phase C** | Backend: source-type schema refactor, Case model, v2 migration | ✅ Done |
-| **Phase D** | Backend: Case CRUD API routes + export endpoint | ⬜ Next |
-| **Phase E** | Backend: AI ingestion for cases (CaseDraft, case review queue) | ⬜ |
-| **Phase F** | Frontend: CaseList, CaseDetail, CaseReviewQueue, export | ⬜ |
+| **Phase D** | Backend: Case CRUD API routes + export endpoint | ✅ Done |
+| **Phase E** | Backend: AI ingestion for cases (CaseDraft, case review queue) | ✅ Done |
+| **Phase F** | Frontend: CaseList, CaseDetail, CaseReviewQueue, export | ⬜ Next |
 | **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ⬜ |
 | **Phase H** | Cleanup: remove dead code, update design principles, smoke test | ⬜ |
 
@@ -312,6 +312,18 @@ Accept / reject with optional field edits
 - `backend/app/api/routes/observations.py`: updated for new `Observation` schema; staleness flag computed at read time; corpus-derived validation on `POST`
 - `backend/app/api/routes/sources.py`: removed `Account` import and creation logic; `_to_source_list`/`_to_source_read` now returns `case_count` for `case_report` sources, `observation_count` for others
 - `backend/app/api/routes/ingest.py` + `backend/app/services/ingestion.py`: removed four deleted enum imports; `ObservationDraft` simplified to `content`, `epistemic_status`, `page_ref`, `verbatim`; AI extraction prompt updated to reflect new observation schema
+
+### Phase D — Backend: Case CRUD API routes + export endpoint
+- `backend/app/api/routes/cases.py`: `GET/POST /cases`, `GET/PATCH/DELETE /cases/{id}`, `GET /sources/{id}/cases`; filter params: `source_id`, `entity_presence`, `sleep_wake_state_at_onset`, `paralysis_reported`, `hypnosis_used`, `corroboration_level`, `repeat_experiencer`, `q`
+- `backend/app/api/routes/export.py`: `GET /cases/export`; same filter params; CSV with pipe-separated JSONB arrays; `StreamingResponse`; `X-Corpus-Snapshot-Date` and `X-Case-Count` response headers
+- `backend/app/main.py`: registered `cases` and `export` routers; export router mounted before cases to avoid `/{id}` shadowing `/export`
+
+### Phase E — Backend: AI ingestion for cases
+- `backend/app/models/corpus.py`: added `reviewed` (bool, default false), `reviewed_by`, `reviewed_at` to `Case` ORM model and `CaseList`/`CaseRead` Pydantic schemas; added `CaseReview` schema (`accepted: bool`, `edits: Optional[CaseUpdate]`)
+- `backend/alembic/versions/0007_case_review_fields.py`: adds three review columns to `cases` table
+- `backend/app/services/ingestion.py`: added `CaseDraft` dataclass; added `_CASE_SYSTEM_PROMPT` (full case extraction prompt — 10 sections, all enum values, strict populate-only-what's-stated rules); added `_call_claude_case()` (calls Claude, strips null/empty fields, returns `CaseDraft`); added `_insert_case()` (inserts with `extraction_method=AI_ASSISTED`, `reviewed=False`); updated `run_ingestion()` dispatch — routes `case_report` sources to `_call_claude_case()`, all others to existing observation extraction path; added `cases_inserted` to `IngestionResult`
+- `backend/app/api/routes/cases.py`: added `GET /cases/review-queue` (unreviewed AI-extracted cases, oldest first); added `POST /cases/{id}/review` (accept with optional field edits → sets reviewed fields; reject → deletes draft)
+- `backend/app/api/routes/ingest.py`: AI path response message dynamically references `/cases/review-queue` or `/observations/review-queue` based on `source_type`
 
 ---
 
