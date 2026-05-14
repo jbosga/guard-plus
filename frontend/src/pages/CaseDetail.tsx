@@ -2,19 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCase, updateCase, deleteCase, reviewCase } from '../api';
-import type {
-  CaseRead, CaseUpdate,
-  ExperiencerSex, EducationLevel, MaritalStatus, Religiosity,
-  PriorInterestLevel, HistoryPresence, MotivationalFactors, RepeatExperiencer,
-  EventDatePrecision, SleepWakeState, PhysicalLocationType, AloneatOnset,
-  PsychologicalStateType, AlteredStateDepth, AlteredStateType, EventDuration,
-  PresenceAbsenceUnknown, ParalysisExtent, EntityCount, EntityType,
-  EntityCommunicationModality, EntityCommunicationContentType,
-  PhysiologicalSymptom, EmotionalValence, PsychometricPresence,
-  ClinicalLevel, ClinicalPresence, PsychometricLevel,
-  MemoryRetrievalMethod, AccountConsistency, CommunityType,
-  CorroborationLevelV2,
-} from '../types';
+import type { CaseUpdate } from '../types';
 import {
   Page, Spinner, ErrorState, Card, SectionHeader,
   Badge, CorroborationBadge, ExtractionMethodBadge, Button,
@@ -89,10 +77,10 @@ type EditState = Record<string, string | string[] | number | boolean | null>;
 function FieldRow({
   label,
   value,
-  name,
+  name: _name,
   editingSection,
-  editState,
-  onEditChange,
+  editState: _editState,
+  onEditChange: _onEditChange,
   children,
 }: {
   label: string;
@@ -649,17 +637,17 @@ export function CaseDetail() {
                   ['dissociation', 'Dissociation'],
                 ] as const).map(([key, label]) => (
                   <React.Fragment key={key}>
-                    <FieldRow label={label} value={displayVal((c as Record<string, string | null>)[`${key}_assessed`])} name={`${key}_assessed`} editingSection={ed} editState={editState} onEditChange={onEditChange}>
-                      {isEditing('psych') && <EnumSelect name={`${key}_assessed`} value={(c as Record<string, string | null>)[`${key}_assessed`]} options={OPT.psychPresence} editState={editState} onEditChange={onEditChange} />}
+                    <FieldRow label={label} value={displayVal((c as unknown as Record<string, string | null>)[`${key}_assessed`])} name={`${key}_assessed`} editingSection={ed} editState={editState} onEditChange={onEditChange}>
+                      {isEditing('psych') && <EnumSelect name={`${key}_assessed`} value={(c as unknown as Record<string, string | null>)[`${key}_assessed`]} options={OPT.psychPresence} editState={editState} onEditChange={onEditChange} />}
                     </FieldRow>
-                    {((c as Record<string, number | null>)[`${key}_score`] != null || isEditing('psych')) && (
-                      <FieldRow label={`${label} score`} value={(c as Record<string, number | null>)[`${key}_score`]} name={`${key}_score`} editingSection={ed} editState={editState} onEditChange={onEditChange}>
-                        {isEditing('psych') && <NumberInput name={`${key}_score`} value={(c as Record<string, number | null>)[`${key}_score`]} editState={editState} onEditChange={onEditChange} />}
+                    {((c as unknown as Record<string, number | null>)[`${key}_score`] != null || isEditing('psych')) && (
+                      <FieldRow label={`${label} score`} value={(c as unknown as Record<string, number | null>)[`${key}_score`]} name={`${key}_score`} editingSection={ed} editState={editState} onEditChange={onEditChange}>
+                        {isEditing('psych') && <NumberInput name={`${key}_score`} value={(c as unknown as Record<string, number | null>)[`${key}_score`]} editState={editState} onEditChange={onEditChange} />}
                       </FieldRow>
                     )}
-                    {((c as Record<string, string | null>)[`${key}_instrument`] || isEditing('psych')) && (
-                      <FieldRow label={`${label} instrument`} value={(c as Record<string, string | null>)[`${key}_instrument`]} name={`${key}_instrument`} editingSection={ed} editState={editState} onEditChange={onEditChange}>
-                        {isEditing('psych') && <TextInput name={`${key}_instrument`} value={(c as Record<string, string | null>)[`${key}_instrument`]} editState={editState} onEditChange={onEditChange} />}
+                    {((c as unknown as Record<string, string | null>)[`${key}_instrument`] || isEditing('psych')) && (
+                      <FieldRow label={`${label} instrument`} value={(c as unknown as Record<string, string | null>)[`${key}_instrument`]} name={`${key}_instrument`} editingSection={ed} editState={editState} onEditChange={onEditChange}>
+                        {isEditing('psych') && <TextInput name={`${key}_instrument`} value={(c as unknown as Record<string, string | null>)[`${key}_instrument`]} editState={editState} onEditChange={onEditChange} />}
                       </FieldRow>
                     )}
                   </React.Fragment>
