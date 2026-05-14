@@ -11,12 +11,10 @@ import { Shell } from '../components/Shell';
 import { AddSourceModal } from '../components/AddSourceModal';
 
 const SOURCE_TYPE_OPTIONS = [
-  { value: 'account', label: 'Account' },
-  { value: 'paper', label: 'Paper' },
-  { value: 'book', label: 'Book' },
-  { value: 'interview', label: 'Interview' },
-  { value: 'media', label: 'Media' },
-  { value: 'field_report', label: 'Field Report' },
+  { value: 'case_report',     label: 'Case Report' },
+  { value: 'empirical_study', label: 'Empirical Study' },
+  { value: 'review_paper',    label: 'Review Paper' },
+  { value: 'theoretical',     label: 'Theoretical' },
 ];
 
 const FRAME_OPTIONS = [
@@ -152,7 +150,7 @@ export function SourceList() {
               }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                    {['Title', 'Type', 'Discipline', 'Provenance', 'Year', 'Obs.', 'Ingestion'].map(h => (
+                    {['Title', 'Type', 'Discipline', 'Provenance', 'Year', 'Items', 'Ingestion'].map(h => (
                       <th key={h} style={{
                         textAlign: 'left', padding: '6px 12px',
                         fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase',
@@ -224,12 +222,21 @@ export function SourceList() {
                         {source.publication_date ?? '—'}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <span style={{
-                          fontWeight: 500,
-                          color: source.observation_count > 0 ? 'var(--accent)' : 'var(--text-dim)',
-                        }}>
-                          {source.observation_count}
-                        </span>
+                        {source.source_type === 'case_report' ? (
+                          <span style={{
+                            fontWeight: 500,
+                            color: (source.case_count ?? 0) > 0 ? 'var(--accent)' : 'var(--text-dim)',
+                          }}>
+                            {source.case_count ?? 0} <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>cases</span>
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontWeight: 500,
+                            color: source.observation_count > 0 ? 'var(--accent)' : 'var(--text-dim)',
+                          }}>
+                            {source.observation_count} <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>obs.</span>
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
                         {source.ingestion_status ? (

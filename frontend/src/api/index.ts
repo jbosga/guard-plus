@@ -4,7 +4,10 @@ import type {
   SourceList, SourceRead, SourceCreate, SourceUpdate,
   DisciplinaryFrame, ProvenanceQuality, SourceType,
   ObservationRead, ObservationCreate, ObservationUpdate,
-  ObservationEpistemicStatus, ContentType, EpistemicDistance,
+  ObservationEpistemicStatus,
+  CaseList, CaseRead, CaseCreate, CaseUpdate, CaseReview,
+  PresenceAbsenceUnknown, SleepWakeState, ParalysisExtent,
+  CorroborationLevelV2, PsychometricPresence, RepeatExperiencer,
   ConceptRead, ConceptRelationshipRead,
   HypothesisList, HypothesisRead, HypothesisCreate, HypothesisUpdate, HypothesisReview,
   TheoreticalFrameworkList, TheoreticalFrameworkRead,
@@ -75,8 +78,6 @@ export interface ObservationsParams {
   page_size?: number;
   source_id?: string;
   epistemic_status?: ObservationEpistemicStatus | ObservationEpistemicStatus[];
-  content_type?: ContentType | ContentType[];
-  epistemic_distance?: EpistemicDistance;
   ai_extracted?: boolean;
   unreviewed?: boolean;
   search?: string;
@@ -101,7 +102,6 @@ export async function reviewObservation(id: string, payload: {
   accepted: boolean;
   edited_content?: string;
   epistemic_status?: ObservationEpistemicStatus;
-  content_type?: ContentType;
 }): Promise<ObservationRead> {
   const { data } = await client.post<ObservationRead>(`/observations/${id}/review`, payload);
   return data;
@@ -115,6 +115,75 @@ export async function createObservation(payload: ObservationCreate): Promise<Obs
 export async function updateObservation(id: string, payload: ObservationUpdate): Promise<ObservationRead> {
   const { data } = await client.patch<ObservationRead>(`/observations/${id}`, payload);
   return data;
+}
+
+// ── Cases ─────────────────────────────────────────────────────────────────────
+
+export interface CasesParams {
+  page?: number;
+  page_size?: number;
+  source_id?: string;
+  entity_presence?: PresenceAbsenceUnknown;
+  sleep_wake_state_at_onset?: SleepWakeState;
+  paralysis_reported?: ParalysisExtent;
+  hypnosis_used?: PsychometricPresence;
+  corroboration_level?: CorroborationLevelV2;
+  repeat_experiencer?: RepeatExperiencer;
+  q?: string;
+}
+
+export async function getCases(params: CasesParams = {}): Promise<Page<CaseList>> {
+  const { data } = await client.get<Page<CaseList>>('/cases', { params });
+  return data;
+}
+
+export async function getCase(id: string): Promise<CaseRead> {
+  const { data } = await client.get<CaseRead>(`/cases/${id}`);
+  return data;
+}
+
+export async function createCase(payload: CaseCreate): Promise<CaseRead> {
+  const { data } = await client.post<CaseRead>('/cases', payload);
+  return data;
+}
+
+export async function updateCase(id: string, payload: CaseUpdate): Promise<CaseRead> {
+  const { data } = await client.patch<CaseRead>(`/cases/${id}`, payload);
+  return data;
+}
+
+export async function deleteCase(id: string): Promise<void> {
+  await client.delete(`/cases/${id}`);
+}
+
+export async function getSourceCases(sourceId: string, params: { page?: number; page_size?: number } = {}): Promise<Page<CaseList>> {
+  const { data } = await client.get<Page<CaseList>>(`/sources/${sourceId}/cases`, { params });
+  return data;
+}
+
+export async function getCaseReviewQueue(params: { page?: number; page_size?: number } = {}): Promise<Page<CaseList>> {
+  const { data } = await client.get<Page<CaseList>>('/cases/review-queue', { params });
+  return data;
+}
+
+export async function reviewCase(id: string, payload: CaseReview): Promise<CaseRead | null> {
+  if (!payload.accepted) {
+    await client.post(`/cases/${id}/review`, payload);
+    return null;
+  }
+  const { data } = await client.post<CaseRead>(`/cases/${id}/review`, payload);
+  return data;
+}
+
+export async function exportCases(params: CasesParams = {}): Promise<{ blob: Blob; caseCount: number; snapshotDate: string }> {
+  const response = await client.get('/cases/export', {
+    params,
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv' });
+  const caseCount = parseInt(response.headers['x-case-count'] ?? '0', 10);
+  const snapshotDate = response.headers['x-corpus-snapshot-date'] ?? new Date().toISOString().slice(0, 10);
+  return { blob, caseCount, snapshotDate };
 }
 
 // ── Hypotheses ────────────────────────────────────────────────────────────────

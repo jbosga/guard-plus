@@ -9,12 +9,10 @@ interface Props {
 }
 
 const TYPE_OPTIONS = [
-  { value: 'paper', label: 'Paper' },
-  { value: 'account', label: 'Account' },
-  { value: 'book', label: 'Book' },
-  { value: 'interview', label: 'Interview' },
-  { value: 'media', label: 'Media' },
-  { value: 'field_report', label: 'Field Report' },
+  { value: 'case_report',     label: 'Case Report' },
+  { value: 'empirical_study', label: 'Empirical Study' },
+  { value: 'review_paper',    label: 'Review Paper' },
+  { value: 'theoretical',     label: 'Theoretical' },
 ];
 
 const FRAME_OPTIONS = [
@@ -43,7 +41,7 @@ const PROV_OPTIONS = [
 export function AddSourceModal({ onClose, onCreated }: Props) {
   const [form, setForm] = useState({
     title: '',
-    source_type: 'paper' as SourceType,
+    source_type: 'empirical_study' as SourceType,
     authors: '',
     publication_date: '',
     url: '',

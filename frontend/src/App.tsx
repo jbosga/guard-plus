@@ -10,6 +10,9 @@ import { HypothesisList } from './pages/HypothesisList';
 import { HypothesisDetail } from './components/HypothesisDetail';
 import { FrameworkList } from './pages/FrameworkList';
 import { FrameworkDetail } from './pages/FrameworkDetail';
+import { CaseList } from './pages/CaseList';
+import { CaseDetail } from './pages/CaseDetail';
+import { CaseReviewQueue } from './pages/CaseReviewQueue';
 
 
 const queryClient = new QueryClient({
@@ -38,6 +41,9 @@ export default function App() {
           <Route path="/hypotheses/:id" element={<RequireAuth><HypothesisDetail /></RequireAuth>} />
           <Route path="/frameworks" element={<RequireAuth><FrameworkList /></RequireAuth>} />
           <Route path="/frameworks/:id" element={<RequireAuth><FrameworkDetail /></RequireAuth>} />
+          <Route path="/cases/review" element={<RequireAuth><CaseReviewQueue /></RequireAuth>} />
+          <Route path="/cases/:id" element={<RequireAuth><CaseDetail /></RequireAuth>} />
+          <Route path="/cases" element={<RequireAuth><CaseList /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/sources" replace />} />
         </Routes>
       </BrowserRouter>

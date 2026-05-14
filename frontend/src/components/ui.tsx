@@ -3,6 +3,7 @@ import type {
   SourceType, ProvenanceQuality, IngestionStatus,
   ObservationEpistemicStatus, ContentType, CollectionMethod,
   HypothesisType, HypothesisStatus, ConfidenceLevel, FrameworkStatus,
+  ExtractionMethod, CorroborationLevelV2, PresenceAbsenceUnknown,
 } from '../types';
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
@@ -178,13 +179,57 @@ export function IngestionDot({ status }: { status: IngestionStatus }) {
 
 // ── Source type ───────────────────────────────────────────────────────────────
 
-const TYPE_LABELS: Record<SourceType, string> = {
-  account: 'account', paper: 'paper', book: 'book',
-  interview: 'interview', media: 'media', field_report: 'field report',
+const SOURCE_TYPE_META: Record<SourceType, { label: string; color: string; bg: string }> = {
+  case_report:     { label: 'case report',     color: 'var(--accent)',       bg: 'rgba(9,105,218,0.08)' },
+  empirical_study: { label: 'empirical study', color: 'var(--status-ok)',    bg: 'var(--status-ok-bg)' },
+  review_paper:    { label: 'review paper',    color: '#a78bfa',             bg: 'rgba(167,139,250,0.08)' },
+  theoretical:     { label: 'theoretical',     color: 'var(--text-secondary)', bg: 'var(--bg-2)' },
 };
 
 export function SourceTypeBadge({ type }: { type: SourceType }) {
-  return <Badge label={TYPE_LABELS[type]} />;
+  const meta = SOURCE_TYPE_META[type] ?? { label: type, color: 'var(--text-dim)', bg: 'var(--bg-2)' };
+  return <Badge label={meta.label} color={meta.color} bg={meta.bg} />;
+}
+
+// ── Extraction method ─────────────────────────────────────────────────────────
+
+const EXTRACT_META: Record<ExtractionMethod, { label: string; color: string; bg: string }> = {
+  manual:      { label: 'manual',      color: 'var(--text-secondary)', bg: 'var(--bg-2)' },
+  ai_assisted: { label: 'AI assisted', color: 'var(--status-info)',    bg: 'var(--status-info-bg)' },
+  imported:    { label: 'imported',    color: 'var(--text-dim)',       bg: 'var(--bg-2)' },
+};
+
+export function ExtractionMethodBadge({ method }: { method: ExtractionMethod }) {
+  const { label, color, bg } = EXTRACT_META[method];
+  return <Badge label={label} color={color} bg={bg} />;
+}
+
+// ── Corroboration level ───────────────────────────────────────────────────────
+
+const CORR_META: Record<CorroborationLevelV2, { label: string; color: string; bg: string }> = {
+  testimony_only:                    { label: 'testimony only',     color: 'var(--text-dim)',     bg: 'var(--bg-2)' },
+  corroborated_by_witness:           { label: '+ witness',          color: 'var(--status-warn)',  bg: 'var(--status-warn-bg)' },
+  corroborated_by_physical_evidence: { label: '+ physical evidence',color: 'var(--status-ok)',    bg: 'var(--status-ok-bg)' },
+  corroborated_by_both:              { label: '+ witness & physical',color: '#a78bfa',             bg: 'rgba(167,139,250,0.08)' },
+  unknown:                           { label: 'unknown',            color: 'var(--text-dim)',     bg: 'var(--bg-2)' },
+};
+
+export function CorroborationBadge({ level }: { level: CorroborationLevelV2 }) {
+  const { label, color, bg } = CORR_META[level];
+  return <Badge label={label} color={color} bg={bg} />;
+}
+
+// ── Entity presence ───────────────────────────────────────────────────────────
+
+const PRESENCE_META: Record<PresenceAbsenceUnknown, { label: string; color: string; bg: string }> = {
+  yes:     { label: 'yes',     color: 'var(--status-ok)',    bg: 'var(--status-ok-bg)' },
+  none:    { label: 'none',    color: 'var(--text-dim)',     bg: 'var(--bg-2)' },
+  unknown: { label: 'unknown', color: 'var(--text-secondary)', bg: 'var(--bg-2)' },
+};
+
+export function PresenceBadge({ value, label }: { value: PresenceAbsenceUnknown; label?: string }) {
+  const { color, bg } = PRESENCE_META[value];
+  return <Badge label={label ?? value} color={color} bg={bg} />;
 }
 
 // ── Provenance ────────────────────────────────────────────────────────────────

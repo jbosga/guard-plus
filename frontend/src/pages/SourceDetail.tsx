@@ -1,13 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSource, getSourceObservations, triggerIngest, updateSource, uploadSourceFile } from '../api';
+import { getSource, getSourceObservations, getSourceCases, triggerIngest, updateSource, uploadSourceFile } from '../api';
 import type { DisciplinaryFrame, ProvenanceQuality, SourceRead } from '../types';
 import { AddObservationModal } from '../components/AddObservationModal';
+import { AddCaseModal } from '../components/AddCaseModal';
 import {
   Page, Spinner, ErrorState, EmptyState,
   SourceTypeBadge, ProvenanceBadge, IngestionDot,
   ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
+  CorroborationBadge, Badge,
   Button, Card, Stat, SectionHeader, Select,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
@@ -40,6 +42,7 @@ export function SourceDetail() {
   const qc = useQueryClient();
   const [ingestError, setIngestError] = useState('');
   const [showAddObs, setShowAddObs] = useState(false);
+  const [showAddCase, setShowAddCase] = useState(false);
   const [editing, setEditing] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,10 +57,18 @@ export function SourceDetail() {
     },
   });
 
+  const isCaseReport = !!source && source.source_type === 'case_report';
+
   const { data: observations, isLoading: obsLoading } = useQuery({
     queryKey: ['source-observations', id],
     queryFn: () => getSourceObservations(id!),
-    enabled: !!id,
+    enabled: !!id && !!source && !isCaseReport,
+  });
+
+  const { data: sourceCases, isLoading: casesLoading } = useQuery({
+    queryKey: ['source-cases', id],
+    queryFn: () => getSourceCases(id!),
+    enabled: !!id && isCaseReport,
   });
 
   const ingestMutation = useMutation({
@@ -105,90 +116,134 @@ export function SourceDetail() {
           {/* Left column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
-            {/* Observations */}
-            <div>
-              <SectionHeader action={
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
-                  {observations?.length ?? 0} observations
-                </span>
-              }>
-                Extracted Observations
-              </SectionHeader>
+            {/* Cases — for case_report sources */}
+            {source.source_type === 'case_report' && (
+              <div>
+                <SectionHeader action={
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
+                    {sourceCases?.total ?? 0} cases
+                  </span>
+                }>
+                  Cases
+                </SectionHeader>
 
-              {obsLoading && <Spinner />}
+                {casesLoading && <Spinner />}
 
-              {observations && observations.length === 0 && (
-                <EmptyState message="no observations extracted yet" />
-              )}
+                {sourceCases && sourceCases.items.length === 0 && (
+                  <EmptyState message="no cases extracted yet" />
+                )}
 
-              {observations && observations.map(obs => (
-                <div
-                  key={obs.id}
-                  style={{
-                    padding: 'var(--space-4)',
-                    borderBottom: '1px solid var(--border-dim)',
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <ObservationEpistemicBadge status={obs.epistemic_status} />
-                    <ContentTypeBadge type={obs.content_type} />
-                    <CollectionMethodBadge method={obs.collection_method} />
-                    {obs.page_ref && (
-                      <span style={{
+                {sourceCases && sourceCases.items.map(c => (
+                  <div
+                    key={c.id}
+                    style={{
+                      padding: 'var(--space-3) var(--space-4)',
+                      borderBottom: '1px solid var(--border-dim)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                  >
+                    <div>
+                      <Link
+                        to={`/cases/${c.id}`}
+                        style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', textDecoration: 'none' }}
+                      >
+                        {c.case_label}
+                      </Link>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                        {c.entity_presence === 'yes' && (
+                          <Badge label="entities" color="var(--status-ok)" bg="var(--status-ok-bg)" />
+                        )}
+                        {c.paralysis_reported && c.paralysis_reported !== 'none' && (
+                          <Badge label={`paralysis: ${c.paralysis_reported}`} color="var(--status-warn)" bg="var(--status-warn-bg)" />
+                        )}
+                        {c.corroboration_level && <CorroborationBadge level={c.corroboration_level} />}
+                        {!c.reviewed && (
+                          <Badge label="unreviewed" color="var(--status-warn)" bg="var(--status-warn-bg)" />
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', flexShrink: 0, marginLeft: 12 }}>
+                      {c.created_at.slice(0, 10)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Observations — for non-case_report sources */}
+            {source.source_type !== 'case_report' && (
+              <div>
+                <SectionHeader action={
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
+                    {observations?.length ?? 0} observations
+                  </span>
+                }>
+                  Extracted Observations
+                </SectionHeader>
+
+                {obsLoading && <Spinner />}
+
+                {observations && observations.length === 0 && (
+                  <EmptyState message="no observations extracted yet" />
+                )}
+
+                {observations && observations.map(obs => (
+                  <div
+                    key={obs.id}
+                    style={{
+                      padding: 'var(--space-4)',
+                      borderBottom: '1px solid var(--border-dim)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                      <ObservationEpistemicBadge status={obs.epistemic_status} />
+                      {obs.page_ref && (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 10,
+                          color: 'var(--text-dim)',
+                        }}>
+                          p.{obs.page_ref}
+                        </span>
+                      )}
+                      {obs.ai_extracted && !obs.reviewed_at && (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 10,
+                          color: 'var(--status-warn)',
+                          background: 'var(--status-warn-bg)',
+                          border: '1px solid var(--status-warn)44',
+                          padding: '1px 7px', borderRadius: 20,
+                        }}>
+                          unreviewed
+                        </span>
+                      )}
+                    </div>
+                    <p style={{
+                      fontSize: 13,
+                      fontFamily: obs.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.6,
+                    }}>
+                      {obs.verbatim && (
+                        <span style={{ color: 'var(--text-dim)', marginRight: 4 }}>"</span>
+                      )}
+                      {obs.content}
+                      {obs.verbatim && (
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 2 }}>"</span>
+                      )}
+                    </p>
+                    {obs.reviewed_by && (
+                      <div style={{
+                        marginTop: 'var(--space-2)',
                         fontFamily: 'var(--font-mono)', fontSize: 10,
                         color: 'var(--text-dim)',
                       }}>
-                        p.{obs.page_ref}
-                      </span>
-                    )}
-                    {obs.ai_extracted && !obs.reviewed_at && (
-                      <span style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10,
-                        color: 'var(--status-warn)',
-                        background: 'var(--status-warn-bg)',
-                        border: '1px solid var(--status-warn)44',
-                        padding: '1px 7px', borderRadius: 20,
-                      }}>
-                        unreviewed
-                      </span>
-                    )}
-                    {obs.epistemic_distance === 'aggregated' && obs.sample_n != null && (
-                      <span style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10,
-                        color: 'var(--text-dim)',
-                        border: '1px solid var(--border-dim)',
-                        padding: '1px 6px', borderRadius: 20,
-                      }}>
-                        n={obs.sample_n}
-                      </span>
+                        reviewed by {obs.reviewed_by}
+                      </div>
                     )}
                   </div>
-                  <p style={{
-                    fontSize: 13,
-                    fontFamily: obs.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
-                    color: 'var(--text-primary)',
-                    lineHeight: 1.6,
-                  }}>
-                    {obs.verbatim && (
-                      <span style={{ color: 'var(--text-dim)', marginRight: 4 }}>"</span>
-                    )}
-                    {obs.content}
-                    {obs.verbatim && (
-                      <span style={{ color: 'var(--text-dim)', marginLeft: 2 }}>"</span>
-                    )}
-                  </p>
-                  {obs.reviewed_by && (
-                    <div style={{
-                      marginTop: 'var(--space-2)',
-                      fontFamily: 'var(--font-mono)', fontSize: 10,
-                      color: 'var(--text-dim)',
-                    }}>
-                      reviewed by {obs.reviewed_by}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Notes */}
             {source.notes && (
@@ -210,7 +265,11 @@ export function SourceDetail() {
 
             {/* Stats */}
             <Card style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-5)' }}>
-              <Stat label="Observations" value={source.observation_count} />
+              {source.source_type === 'case_report' ? (
+                <Stat label="Cases" value={source.case_count ?? 0} />
+              ) : (
+                <Stat label="Observations" value={source.observation_count} />
+              )}
               <Stat label="Year" value={source.publication_date ?? '—'} />
             </Card>
 
@@ -371,7 +430,20 @@ export function SourceDetail() {
                   </p>
                 )}
 
-                {source.ingestion_status === 'complete' && (
+                {source.ingestion_status === 'complete' && source.source_type === 'case_report' && (
+                  <Link
+                    to="/cases/review"
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: 'var(--accent)',
+                      textDecoration: 'none',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    → review extracted cases
+                  </Link>
+                )}
+                {source.ingestion_status === 'complete' && source.source_type !== 'case_report' && (
                   <Link
                     to={`/review?source_id=${source.id}`}
                     style={{
@@ -390,13 +462,20 @@ export function SourceDetail() {
             {/* Manual entry */}
             <Card style={{ padding: 'var(--space-4)' }}>
               <SectionHeader>Manual Entry</SectionHeader>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => setShowAddObs(true)}
-              >
-                + add observation
-              </Button>
+              {source.source_type === 'case_report' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <Button size="sm" variant="primary" onClick={() => setShowAddCase(true)}>
+                    + add case
+                  </Button>
+                  <Link to="/cases/review">
+                    <Button size="sm" style={{ width: '100%' }}>→ review queue</Button>
+                  </Link>
+                </div>
+              ) : (
+                <Button size="sm" variant="primary" onClick={() => setShowAddObs(true)}>
+                  + add observation
+                </Button>
+              )}
             </Card>
 
             {/* ID */}
@@ -419,6 +498,13 @@ export function SourceDetail() {
             qc.invalidateQueries({ queryKey: ['source-observations', id] });
             qc.invalidateQueries({ queryKey: ['source', id] });
           }}
+        />
+      )}
+
+      {showAddCase && (
+        <AddCaseModal
+          sourceId={source.id}
+          onClose={() => setShowAddCase(false)}
         />
       )}
     </Shell>

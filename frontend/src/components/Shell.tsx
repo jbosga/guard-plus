@@ -2,12 +2,14 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const NAV_ITEMS = [
-  { path: '/sources',      label: 'Sources',      icon: '📄' },
-  { path: '/observations', label: 'Observations', icon: '🔭' },
-  { path: '/review',       label: 'Review Queue', icon: '✅' },
-  { path: '/hypotheses',   label: 'Hypotheses',   icon: '🔬' },
-  { path: '/frameworks',   label: 'Frameworks',   icon: '🧩' },
-  { path: '/graph',        label: 'Graph',        icon: '◈'  },
+  { path: '/sources',      label: 'Sources',         icon: '📄' },
+  { path: '/cases',        label: 'Cases',            icon: '🗂' },
+  { path: '/cases/review', label: 'Case Review',      icon: '🔍' },
+  { path: '/observations', label: 'Observations',    icon: '🔭' },
+  { path: '/review',       label: 'Review Queue',    icon: '✅' },
+  { path: '/hypotheses',   label: 'Hypotheses',      icon: '🔬' },
+  { path: '/frameworks',   label: 'Frameworks',      icon: '🧩' },
+  { path: '/graph',        label: 'Graph',            icon: '◈'  },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -77,7 +79,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       }}>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 var(--space-2)' }}>
           {NAV_ITEMS.map(item => {
-            const active = pathname.startsWith(item.path);
+            const active = item.path === '/cases'
+            ? pathname === '/cases' || (pathname.startsWith('/cases/') && !pathname.startsWith('/cases/review'))
+            : pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}
