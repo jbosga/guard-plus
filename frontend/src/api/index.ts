@@ -161,8 +161,8 @@ export async function getSourceCases(sourceId: string, params: { page?: number; 
   return data;
 }
 
-export async function getCaseReviewQueue(params: { page?: number; page_size?: number } = {}): Promise<Page<CaseList>> {
-  const { data } = await client.get<Page<CaseList>>('/cases/review-queue', { params });
+export async function getCaseReviewQueue(): Promise<CaseRead[]> {
+  const { data } = await client.get<CaseRead[]>('/cases/review-queue');
   return data;
 }
 

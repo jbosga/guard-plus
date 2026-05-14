@@ -19,7 +19,7 @@ import { Page } from '../components/Shell';
 import {
   Badge, Button, Select, Spinner, ErrorState, EmptyState,
   HypothesisTypeBadge, HypothesisStatusBadge, ConfidenceBadge,
-  FrameworkStatusBadge, ObservationEpistemicBadge, ContentTypeBadge,
+  FrameworkStatusBadge, ObservationEpistemicBadge,
 } from '../components/ui';
 
 // ── Node type colours ─────────────────────────────────────────────────────────
@@ -422,7 +422,6 @@ function DetailPanel({
         <Field label="Classification">
           <BadgeRow>
             <ObservationEpistemicBadge status={obs.epistemic_status} />
-            <ContentTypeBadge type={obs.content_type} />
           </BadgeRow>
         </Field>
         <Field label="Role in linked hypothesis">

@@ -10,7 +10,7 @@ import type {
 } from '../types';
 import {
   Page, Spinner, ErrorState, EmptyState,
-  Badge, ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
+  Badge, ObservationEpistemicBadge,
   HypothesisStatusBadge, HypothesisTypeBadge, ConfidenceBadge,
   Button, Card, Select, Input,
 } from '../components/ui';
@@ -95,8 +95,6 @@ function ObsRow({
         </p>
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
           <ObservationEpistemicBadge status={obs.epistemic_status} />
-          <ContentTypeBadge type={obs.content_type} />
-          <CollectionMethodBadge method={obs.collection_method} />
           {obs.source_title && (
             <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
               {obs.source_title}
@@ -189,8 +187,6 @@ function ObservationAdder({
             <div style={{ marginBottom: 4 }}>{o.content}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <ObservationEpistemicBadge status={o.epistemic_status} />
-              <ContentTypeBadge type={o.content_type} />
-              <CollectionMethodBadge method={o.collection_method} />
               {o.source_title && (
                 <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
                   {o.source_title}

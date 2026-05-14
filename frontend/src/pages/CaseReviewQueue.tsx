@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCaseReviewQueue, reviewCase, getCase } from '../api';
-import type { CaseList, CaseUpdate } from '../types';
+import { getCaseReviewQueue, reviewCase } from '../api';
+import type { CaseRead } from '../types';
 import {
-  Page, Spinner, ErrorState, EmptyState, Pagination, Card,
-  SectionHeader, Badge, Button,
+  Page, Spinner, ErrorState, EmptyState, Card,
+  Badge, Button,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
 
@@ -32,17 +32,12 @@ function displayEnum(v: string | null | undefined) {
   return v ? v.replace(/_/g, ' ') : null;
 }
 
-function ReviewCard({ item, onDone }: { item: CaseList; onDone: () => void }) {
+function ReviewCard({ item: full, onDone }: { item: CaseRead; onDone: () => void }) {
   const qc = useQueryClient();
   const [rejected, setRejected] = useState(false);
 
-  const { data: full, isLoading } = useQuery({
-    queryKey: ['case', item.id],
-    queryFn: () => getCase(item.id),
-  });
-
   const acceptMutation = useMutation({
-    mutationFn: () => reviewCase(item.id, { accepted: true }),
+    mutationFn: () => reviewCase(full.id, { accepted: true }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['case-review-queue'] });
       qc.invalidateQueries({ queryKey: ['cases'] });
@@ -51,7 +46,7 @@ function ReviewCard({ item, onDone }: { item: CaseList; onDone: () => void }) {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: () => reviewCase(item.id, { accepted: false }),
+    mutationFn: () => reviewCase(full.id, { accepted: false }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['case-review-queue'] });
       qc.invalidateQueries({ queryKey: ['cases'] });
@@ -60,14 +55,6 @@ function ReviewCard({ item, onDone }: { item: CaseList; onDone: () => void }) {
   });
 
   const isPending = acceptMutation.isPending || rejectMutation.isPending;
-
-  if (isLoading || !full) {
-    return (
-      <Card style={{ padding: 'var(--space-4)' }}>
-        <Spinner />
-      </Card>
-    );
-  }
 
   return (
     <Card style={{ padding: 'var(--space-4)' }}>
@@ -275,21 +262,20 @@ function ReviewCard({ item, onDone }: { item: CaseList; onDone: () => void }) {
 // ── CaseReviewQueue page ──────────────────────────────────────────────────────
 
 export function CaseReviewQueue() {
-  const [page, setPage] = useState(1);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['case-review-queue', page],
-    queryFn: () => getCaseReviewQueue({ page, page_size: 5 }),
+    queryKey: ['case-review-queue'],
+    queryFn: () => getCaseReviewQueue(),
   });
 
-  const visibleItems = data?.items.filter(item => !dismissed.has(item.id)) ?? [];
+  const visibleItems = (data ?? []).filter(item => !dismissed.has(item.id));
 
   return (
     <Shell>
       <Page
         title="Case Review Queue"
-        subtitle={data ? `${data.total} cases pending review` : undefined}
+        subtitle={data ? `${data.length} cases pending review` : undefined}
       >
         {isLoading && <Spinner />}
         {isError && <ErrorState message="Failed to load review queue" />}
@@ -310,15 +296,6 @@ export function CaseReviewQueue() {
             />
           ))}
         </div>
-
-        {data && (
-          <Pagination
-            page={data.page}
-            pages={data.pages}
-            total={data.total}
-            onPage={p => { setPage(p); setDismissed(new Set()); }}
-          />
-        )}
       </Page>
     </Shell>
   );
