@@ -621,12 +621,15 @@ export function GraphView() {
 
   const buildElements = useCallback((): cytoscape.ElementDefinition[] => {
     const frameworks = frameworkData?.items ?? [];
+    const fwReads = fwReadQueries.data ?? [];
     const hypotheses = hypReadQueries.data ?? [];
 
     if (frameworks.length === 0 && hypotheses.length === 0) return [];
 
     const elements: cytoscape.ElementDefinition[] = [];
     const obsNodeIds = new Set<string>();
+
+    const fwReadMap = new Map<string, TheoreticalFrameworkRead>(fwReads.map(f => [f.id, f]));
 
     const visibleFrameworks = filterFrameworkId
       ? frameworks.filter(f => f.id === filterFrameworkId)
@@ -646,39 +649,55 @@ export function GraphView() {
       });
     });
 
+    // Build set of hypothesis IDs that actually belong to visible frameworks
+    const memberHypIds = new Set<string>();
+    visibleFrameworks.forEach(fw => {
+      const fwRead = fwReadMap.get(fw.id);
+      if (!fwRead) return;
+      fwRead.core_hypotheses.forEach(h => memberHypIds.add(h.id));
+      fwRead.anomalous_hypotheses.forEach(h => memberHypIds.add(h.id));
+    });
+
     // Determine which hypotheses to show
     const visibleHyps = filterFrameworkId
-      ? hypotheses.filter(h => {
-          const fw = visibleFrameworks[0];
-          return fw && h.framework === fw.framework_type;
-        })
+      ? hypotheses.filter(h => memberHypIds.has(h.id))
       : hypotheses;
 
     const visibleHypIds = new Set(visibleHyps.map(h => h.id));
 
-    // Hypothesis → Framework edges
-    // We use framework data to know core vs anomalous membership
-    // Since we only have TheoreticalFrameworkList (not Read), we don't have
-    // individual hypothesis IDs from framework side. We create an edge
-    // from each hypothesis to its matching framework using framework_type matching.
-    // A hypothesis with 'core' status vs 'anomalous' in a framework can't be
-    // distinguished without FrameworkRead. Default to 'core' style.
-    // TODO: fetch FrameworkRead to get proper core/anomalous hypothesis sets.
-    visibleHyps.forEach(hyp => {
-      const matchingFw = visibleFrameworks.find(fw => fw.framework_type === hyp.framework);
-      if (matchingFw) {
+    // Hypothesis → Framework edges using explicit membership from FrameworkRead
+    visibleFrameworks.forEach(fw => {
+      const fwRead = fwReadMap.get(fw.id);
+      if (!fwRead) return;
+      fwRead.core_hypotheses.forEach(h => {
+        if (!visibleHypIds.has(h.id)) return;
         elements.push({
           data: {
-            id: `fw-hyp-${matchingFw.id}-${hyp.id}`,
-            source: hyp.id,
-            target: matchingFw.id,
+            id: `fw-hyp-core-${fw.id}-${h.id}`,
+            source: h.id,
+            target: fw.id,
             color: EDGE_COLORS.hyp_core,
             label: 'core of',
             width: 2,
             edgeKind: 'hyp_core',
           },
         });
-      }
+      });
+      fwRead.anomalous_hypotheses.forEach(h => {
+        if (!visibleHypIds.has(h.id)) return;
+        elements.push({
+          data: {
+            id: `fw-hyp-anom-${fw.id}-${h.id}`,
+            source: h.id,
+            target: fw.id,
+            color: EDGE_COLORS.hyp_anomalous,
+            label: '⚠ anomalous to',
+            width: 2.5,
+            edgeKind: 'hyp_anomalous',
+          },
+          classes: 'anomalous-edge',
+        });
+      });
     });
 
     // Hypothesis nodes + obs edges
@@ -776,7 +795,7 @@ export function GraphView() {
     });
 
     return elements;
-  }, [frameworkData, hypReadQueries.data, filterFrameworkId, anomalousOnly]);
+  }, [frameworkData, fwReadQueries.data, hypReadQueries.data, filterFrameworkId, anomalousOnly]);
 
   // ── Cytoscape init / update ────────────────────────────────────────────────
 
