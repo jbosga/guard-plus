@@ -2,82 +2,114 @@
 
 ## Project Overview
 
-A self-hosted web application for rigorous scientific study of the alien abduction experience. The system supports systematic phenomenological mapping of first-person accounts, cross-disciplinary literature management, and structured hypothesis development.
+A self-hosted web application for rigorous scientific study of the alien abduction experience (AAE). The system supports structured collection of case data, cross-disciplinary literature management, and hypothesis development and testing.
 
-**Epistemological stance:** Neither credulous nor dismissive. First-person accounts are treated as empirical data requiring explanation. Anomalies are signals, not noise. The system is designed to counteract confirmation bias structurally.
+**Epistemological stance:** Neither credulous nor dismissive. First-person accounts are treated as primary empirical data. Anomalies are signals, not noise. Confirmation bias is countered at the schema level.
 
 ---
 
 ## Architecture
 
-### Three-layer data model
+### Four-layer data model
 
 ```
-CORPUS LAYER          CLAIM LAYER           SYNTHESIS LAYER
-(raw sources)    →    (extracted atoms)  →  (built knowledge)
+CASE LAYER              OBSERVATION LAYER         SYNTHESIS LAYER
+Case                    Observation               Hypothesis
+  (structured             (literature-sourced   →   TheoreticalFramework
+   case report)            or corpus-derived)        Concept / ConceptRelationship
+       ↓
+   CSV export
+       ↓
+   external analysis (R, Python, etc.)
+       ↓
+   re-entry as corpus-derived Observation
 ```
 
-The Claim layer is the critical intermediary — most tools collapse this, losing epistemic traceability. Every claim is attributed to a source, carries an epistemic status, and is tagged at the atom level.
+**Cases are not observations.** A case is a structured empirical record of a single AAE account, linked to a `case_report` source. An observation is a derived claim about a pattern — either extracted from a literature source (empirical study, review, theoretical paper) or computed externally from the case corpus and re-entered with provenance metadata. The observation → hypothesis → framework layer operates entirely above the case layer.
+
+### Source types
+
+| Source type | Feeds | Extraction method |
+|---|---|---|
+| `case_report` | Case layer | PDF → AI extraction → `Case` draft → review queue |
+| `empirical_study` | Observation layer | PDF → AI extraction → `Observation` drafts → review queue |
+| `review_paper` | Observation layer | PDF → AI extraction → `Observation` drafts → review queue |
+| `theoretical` | Observation layer | PDF → AI extraction → `Observation` drafts → review queue |
+
+### Corpus-derived observations
+
+When a researcher exports case data, runs external analysis, and wants to register the result as an observation, they re-enter it manually with `observation_source_type = corpus_derived`. These observations carry: `query_definition` (the code or procedure used), `analysis_tool`, `corpus_snapshot_date`, `case_count_at_snapshot`, and `cases_included`. A `staleness_flag` is automatically set when the current case count exceeds `case_count_at_snapshot` by >20%.
 
 ### Tech stack
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| Database | PostgreSQL 16 | Relational model required; full-text search, JSONB, recursive queries for tag hierarchy |
-| Backend | Python + FastAPI | Clean REST API, Pydantic validation, Python AI/NLP ecosystem |
+| Database | PostgreSQL 16 | Relational model; JSONB for multi-select fields; full-text search |
+| Backend | Python + FastAPI | Clean REST API, Pydantic validation, Python AI ecosystem |
 | Frontend | React + Vite + TypeScript | Mature ecosystem for graph viz and complex UI |
-| Graph viz | Cytoscape.js | Better than vis.js for analytical filtering and programmatic graph analysis |
-| AI assistance | Anthropic Claude API | Claim extraction, pattern detection, hypothesis stress-testing |
-| Infrastructure | Docker Compose | One-command startup; clean path to VPS deployment |
-| File storage | Local filesystem (MVP) → S3 | PDFs/originals stored as files; raw text stored in DB |
+| Graph viz | Cytoscape.js | Analytical filtering and programmatic graph analysis |
+| AI assistance | Anthropic Claude API | Case and observation extraction, hypothesis stress-testing |
+| Infrastructure | Docker Compose | One-command startup; VPS deployment |
+| File storage | Local filesystem (MVP) → S3 | PDFs stored as files; raw text stored in DB |
 
-### Deployment target
+### Deployment
 
-Web app (not desktop). Initially single-user, designed for multi-user from the start.
+Self-hosted VPS (Hostnet.nl), domain: guardproject.nl, HTTPS via Let's Encrypt/Certbot. Initially single-user, designed for multi-user.
 
 ---
 
 ## Data Model
 
-### Source (Corpus layer)
+### Case (case layer — primary empirical unit)
+
+Structured record of a single AAE account. All fields optional except `source_id` and `case_label`; empty = unknown. Enum fields with explicit `none` value distinguish confirmed absence from unknown.
+
+Sections: Identification & Provenance · Context & Demographics · Background History · Onset Conditions · Phenomenological Content · Physical & Physiological Evidence · Psychological Profile · Memory & Retrieval · Aftermath & Long-Term Effects · Corroboration Quality.
+
+Multi-select enum fields stored as JSONB arrays (e.g. `entity_types`, `physiological_symptoms`, `memory_retrieval_method`, `emotional_valence_during_event`).
+
+Key fields: `source_id`, `case_label`, `extraction_method`, `experiencer_nationality`, `experiencer_age_at_event`, `sleep_wake_state_at_onset`, `entity_presence`, `entity_types[]`, `paralysis_reported`, `hypnosis_used`, `memory_retrieval_method[]`, `corroboration_level`, `fantasy_proneness_score`, `dissociation_score`, `positive_transformation_reported`, `ongoing_contact_reported`.
+
+### Source (corpus layer)
 
 ```
 Source
 ├── id (UUID)
-├── type: [account | paper | book | interview | media | field_report]
+├── source_type: [case_report | empirical_study | review_paper | theoretical]  ← required; gates extraction schema
 ├── title, author(s), date, url/doi
-├── disciplinary_frame: [neuroscience | psychology | folklore | physics | 
-│                         parapsychology | sociology | anthropology | psychiatry | ufology | philosophy | other]
-├── provenance_quality: [peer_reviewed | grey_literature | anecdotal | 
-│                        investigator_report | self_reported | unknown]
+├── disciplinary_frame
+├── provenance_quality
 ├── ingestion_date, ingestion_status, ingestion_error
 ├── raw_text          ← stored in DB for re-analysis
 ├── file_ref          ← path to original file
 └── notes
-
-Account (extends Source, 1:1)
-├── account_date
-├── reporter_demographics (JSONB)
-├── reporting_lag_days
-├── context: [sleep | wake | hypnagogic | hypnopompic | altered_state | full_consciousness | unknown]
-└── corroboration: [none | witness | physical_trace | investigator | multiple]
 ```
 
-### Claim (middle tier — do not collapse into Source)
+Note: `Account` model removed in v2. Case records replace its function.
+
+### Observation (observation layer)
 
 ```
-Claim
+Observation
 ├── id (UUID)
-├── source_id         (FK → Source)
-├── claim_text
-├── verbatim: boolean
-├── page_ref / timestamp_ref
-├── epistemic_status: [asserted | observed | inferred | speculative | contested | retracted]
-├── claim_type: [phenomenological | causal | correlational | definitional | methodological]
+├── source_id                    (FK → Source; null for corpus_derived)
+├── observation_source_type: [literature | corpus_derived]
+├── content                      (the claim text)
+├── epistemic_status: [reported | corroborated | contested | artefactual | retracted]
+├── authored_by                  (researcher name; corpus_derived only)
+│
+│   ── corpus-derived fields (null when literature) ──
+├── query_definition             (code or procedure used)
+├── analysis_tool                (e.g. "Python/pandas", "R")
+├── corpus_snapshot_date
+├── case_count_at_snapshot
+├── cases_included: [all | filtered_subset]
+├── case_filter_description
+├── staleness_flag               (system-derived: true when case count drifts >20%)
+│
 ├── ai_extracted: boolean
-├── ingestion_method: [ai | manual | bulk_import]
 ├── reviewed_by / reviewed_at
-└── tags[]            (FK → PhenomenonTag)
+└── tags[]                       (FK → PhenomenonTag)
 ```
 
 ### PhenomenonTag (controlled vocabulary)
@@ -94,67 +126,101 @@ PhenomenonTag
 ```
 Concept
 ├── id (UUID), label, concept_type, description, epistemic_status
-└── supporting_claims[]
 
 ConceptRelationship
 ├── source_concept_id, target_concept_id
-├── relationship_type: [..., anomalous_given]    ← key: flags unexplained tensions
+├── relationship_type: [..., anomalous_given]    ← flags unexplained tensions
 ├── strength: [weak | moderate | strong]
-└── supporting_claims[]
+└── notes
 ```
 
-### Hypothesis (synthesis workspace)
+### Hypothesis (synthesis layer)
 
 ```
 Hypothesis
 ├── id (UUID), label, description
-├── framework: [neurological | psychological | sociocultural | physical | 
+├── hypothesis_type
+├── framework: [neurological | psychological | sociocultural | physical |
 │               interdimensional | information_theoretic | psychospiritual | unknown]
 ├── assumed_ontologies[]: [physicalism | dualism | panpsychism | idealism | unknown | novel]
-├── scope_claims[]        ← what it purports to explain
-├── supporting_claims[]   ← evidence in favor
-├── anomalous_claims[]    ← REQUIRED: evidence it cannot explain (anti-bias mechanism)
+├── falsification_condition      ← required for epistemic integrity
+├── confidence_level: [speculative | low | moderate | high]
+├── supporting_observations[]    ← evidence in favour
+├── anomalous_observations[]     ← REQUIRED: evidence it cannot explain
 ├── competing_hypotheses[]
-└── status: [active | abandoned | merged | speculative]
+├── parent_hypothesis_id         ← sub-hypothesis support
+└── status: [active | dormant | abandoned | merged | refuted]
 ```
 
-**`anomalous_claims` is structurally enforced** — the API emits `X-Warning` and the UI shows a red warning when this list is empty.
+**`anomalous_observations` is structurally enforced** — API emits `X-Warning-Anomalous` and UI shows a red warning when empty.
+
+### TheoreticalFramework (synthesis layer)
+
+```
+TheoreticalFramework
+├── id (UUID), label, description
+├── framework_type
+├── assumed_ontologies[]
+├── confidence_level
+├── status: [active | dormant | abandoned]
+├── core_hypotheses[]
+└── anomalous_hypotheses[]       ← REQUIRED: API emits X-Warning when empty
+```
 
 ### EpistemicNote (global annotation layer)
 
-Attaches to any entity (Claim | Concept | Hypothesis | ConceptRelationship | Source) without polluting primary records.
+Attaches to any entity without polluting primary records.
 
 ---
 
-## Data Ingestion Pipeline
+## Ingestion Pipeline
 
 ### Principles
 
 - **AI-assisted human curation**, not full automation
 - Silent errors are worse than slow throughput
-- Claude API suggests; human reviewer confirms before claims enter the corpus
+- Claude API suggests; human reviewer confirms before records enter the corpus
 
-### Source types and approach
+### Dispatch logic
 
-| Source type | Extraction method |
-|---|---|
-| Modern PDFs (text-selectable) | `pymupdf` → Claude API claim extraction |
-| Scanned PDFs | Tesseract OCR fallback → same pipeline |
-| Excel (existing data) | `import_excel.py` one-time migration script |
-
-### Ingestion flow
+`source.source_type` gates which extraction path runs:
 
 ```
-Upload file → POST /{source_id}/upload
+Upload PDF → POST /sources/{id}/upload
     ↓
-Trigger AI extraction → POST /{source_id}/ingest  { method: "ai" }
-    ↓  (returns 202, runs as BackgroundTask)
-Poll GET /sources/{source_id} for ingestion_status
+POST /sources/{id}/ingest  { method: "ai" }
+    ↓  (202, BackgroundTask)
+    ├── source_type == case_report  →  extract_case_from_pdf()  →  CaseDraft
+    └── source_type == other        →  extract_observations_from_pdf()  →  ObservationDraft[]
+    ↓
+Poll GET /sources/{id} for ingestion_status
     ↓  (complete)
-Review queue: GET /claims/review-queue
+Review queue:
+    ├── cases:        GET /api/v1/cases/review-queue
+    └── observations: GET /api/v1/observations/review-queue
     ↓
-POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status? }
+Accept / reject with optional field edits
 ```
+
+### Case extraction prompt principles
+
+- Populate only fields explicitly stated in the source text
+- Leave all other fields null (empty = unknown, not absent)
+- Flag ambiguous values in `notes`
+- Do not infer or interpolate beyond what is written
+
+---
+
+## Application Workflow
+
+1. Add a source (+ PDF) — source type declared upfront, gates downstream schema
+2. Extract records — cases for `case_report` sources; observations for all others
+3. Review AI-extracted drafts — accept with optional edits, or reject
+4. Browse and export cases — filter, inspect, export CSV for external analysis
+5. Re-enter computed results as corpus-derived observations
+6. Build hypotheses — link supporting and anomalous observations
+7. Combine hypotheses into theoretical frameworks
+8. Visualise concept relationships in the knowledge graph
 
 ---
 
@@ -166,12 +232,18 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 | **Chat 2** | FastAPI CRUD endpoints, Pydantic schemas, JWT auth | ✅ Done |
 | **Chat 3** | Excel import script (`import_excel.py`) | ✅ Done |
 | **Chat 4** | PDF ingestion pipeline (pymupdf, OCR, Claude API claim extraction) | ✅ Done |
-| **Chat 5** | React frontend core (source list, source detail, claims list, review queue skeleton, hypotheses list) | ✅ Done |
-| **Chat 6** | Ingestion review queue UI (full reviewer UX) | ✅ Done |
+| **Chat 5** | React frontend core | ✅ Done |
+| **Chat 6** | Ingestion review queue UI | ✅ Done |
 | **Chat 7** | Knowledge graph view (Cytoscape.js) | ✅ Done |
 | **Chat 8** | Hypothesis workspace (synthesis layer) | ✅ Done |
 | **Phase A** | Backend data model refactor: Claim→Observation, Hypothesis→{Hypothesis,TheoreticalFramework} | ✅ Done |
-| **Phase B** | Frontend refactor: all Claim→Observation, new Hypothesis/Framework types, new badges, FrameworkList/FrameworkDetail pages | ✅ Done |
+| **Phase B** | Frontend refactor: Claim→Observation, new Hypothesis/Framework types, FrameworkList/FrameworkDetail | ✅ Done |
+| **Phase C** | Backend: source-type schema refactor, Case model, v2 migration | ✅ Done |
+| **Phase D** | Backend: Case CRUD API routes + export endpoint | ⬜ Next |
+| **Phase E** | Backend: AI ingestion for cases (CaseDraft, case review queue) | ⬜ |
+| **Phase F** | Frontend: CaseList, CaseDetail, CaseReviewQueue, export | ⬜ |
+| **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ⬜ |
+| **Phase H** | Cleanup: remove dead code, update design principles, smoke test | ⬜ |
 
 ---
 
@@ -198,130 +270,741 @@ POST /claims/{id}/review  { accepted: true/false, edited_text?, epistemic_status
 - `alembic/versions/0003_add_ingestion_fields.py`: `ingestion_status`, `ingestion_method`, `ingestion_error`
 
 ### Chat 5 — React Frontend
-- `frontend/` — Vite + React 18 + TypeScript, zero CRA remnants
-- **Design system:** IBM Plex Mono/Sans/Serif, dark instrument aesthetic, CSS custom properties
-- **`src/types/index.ts`** — full TypeScript types mirroring all backend schemas
-- **`src/api/`** — Axios client with JWT injection + 401 redirect; typed API functions
-- **`src/components/Shell.tsx`** — sidebar nav (`SRC / CLM / RVW / HYP`), `Page` wrapper
-- **`src/components/ui.tsx`** — `Badge`, `EpistemicBadge`, `ClaimTypeBadge`, `IngestionDot`, `ProvenanceBadge`, `Button`, `Input`, `Select`, `Card`, `Stat`, `Pagination`, `Spinner`, `EmptyState`, `ErrorState`
-- **`src/components/AddSourceModal.tsx`** — full source creation form
-- **`src/pages/Login.tsx`** — JWT auth form
-- **`src/pages/SourceList.tsx`** — table with type/discipline/provenance/full-text filters, pagination
-- **`src/pages/SourceDetail.tsx`** — metadata panel, claims list, ingest trigger button, ingestion status
-- **`src/pages/ClaimList.tsx`** — filter bar: epistemic status, claim type, origin, unreviewed toggle
-- **`src/pages/ReviewQueue.tsx`** — functional accept/reject cards with epistemic override (expanded in Chat 6)
-- **`src/pages/HypothesisList.tsx`** — framework cards, supporting/anomalous counts, red warning on empty anomalous_claims
+- `frontend/` — Vite + React 18 + TypeScript
+- **Design system:** GitHub-style off-white (`#f6f8fa`), white cards, `#1f2328` text, `#0969da` blue accent, Inter + JetBrains Mono fonts
+- `src/types/index.ts` — full TypeScript types mirroring backend schemas
+- `src/api/` — Axios client with JWT injection + 401 redirect; typed API functions
+- `src/components/Shell.tsx` — sidebar nav, `Page` wrapper
+- `src/components/ui.tsx` — full shared component library
+- `src/pages/`: Login, SourceList, SourceDetail, ClaimList, ReviewQueue, HypothesisList
 
 ### Chat 6 — Minor improvements
-- Review queue was deemed sufficient in current state
-- Added source title to claims
-- Added dynamic ingestion status
+- Review queue deemed sufficient; added source title to claims; added README.md
 
 ### Chat 7 — Knowledge Graph View
-- **`src/pages/GraphView.tsx`** — full Cytoscape.js graph view at `/graph`
-- Node colour by concept type (phenomenon, mechanism, entity, location, process, theoretical_construct); node size scales with `supporting_claim_ids` count (clamped 20–48px)
-- Edge colour and dashed style by relationship type; `anomalous_given` edges rendered in intentionally loud red with dashed stroke
-- Edge width by strength (weak / moderate / strong)
-- Filter bar: concept type dropdown, relationship type dropdown, "⚠ anomalous only" toggle (mutually exclusive with rel-type filter); Clear button
-- Click-on-node → neighbourhood highlight (all other elements dimmed to 8–25% opacity) + `DetailPanel` slide-in (300px): concept type, label, description, epistemic status badge, supporting claim count, all connected edges with direction arrow and neighbour label
-- Click on canvas background → deselect and remove dimming
-- Toolbar: Fit (fit all) and Center (zoom to selected node or fit all)
-- Collapsible Legend (bottom-left): node type colour swatches + edge type colour swatches
-- Zoom hint (bottom-right): scroll / drag / click affordances
-- Cose layout with physics tuning (nodeRepulsion 400k, gravity 80, 1000 iterations); re-runs on filter change without destroying the instance
-- Fetches up to 200 concepts and 500 relationships via `getConcepts` / `getRelationships`
-- **`src/App.tsx`** — added `/graph` route → `<GraphView />`
-- **`src/components/Shell.tsx`** — added `GRF` nav entry
-- **`src/api/index.ts`** — added `getRelationships()` typed API call
-- **`src/types/index.ts`** — added `ConceptRelationshipRead`, `RelationshipType` types
-
-### Phase A — Backend Data Model Refactor
-
-**Architecture:** Three-layer epistemic model now fully implemented.
-
-```
-CORPUS LAYER          OBSERVATION LAYER         SYNTHESIS LAYER
-(raw sources)    →    (epistemic atoms)      →  (built knowledge)
-Source                Observation                Hypothesis
-Account               ObservationReview          TheoreticalFramework
-PhenomenonTag                                    Concept / ConceptRelationship
-```
-
-**Enums added** (`backend/app/models/enums.py`):
-- `ObservationEpistemicStatus`: reported | corroborated | contested | artefactual | retracted
-- `ContentType`, `SourceModality`, `EpistemicDistance`, `CollectionMethod` — four-axis epistemic provenance
-- `SampleSizeTier`, `SamplingMethod` — aggregate study metadata
-- `HypothesisType`, `ConfidenceLevel`, `FrameworkStatus` — hypothesis layer
-- New `HypothesisStatus` (active | dormant | abandoned | merged | refuted — replaces old speculative/active)
-- `EpistemicStatus` retained (still used by Concept — will migrate in the Concept refactor phase)
-
-**Corpus layer** (`backend/app/models/corpus.py`):
-- `Claim` → `Observation` with full epistemic provenance (content_type, source_modality, epistemic_distance, collection_method, corroboration_level, sample fields)
-- `ObservationCreate` validator: aggregate fields only allowed when `epistemic_distance == aggregated`
-- `Source.claims` → `Source.observations`
-
-**Synthesis layer** (`backend/app/models/synthesis.py`):
-- Old `Hypothesis` replaced by new `Hypothesis` (observation-linked, with `hypothesis_type`, `falsification_condition`, `confidence_level`, `parent_hypothesis_id`)
-- New `TheoreticalFramework` (groups hypotheses by framework; `core_hypotheses` + `anomalous_hypotheses`)
-- `Concept` and `ConceptRelationship` retained; `supporting_claims` relationship dropped (Concept observation anchoring is a known follow-on phase)
-
-**API routes:**
-- `backend/app/api/routes/claims.py` → deleted
-- `backend/app/api/routes/observations.py` — full CRUD + review queue at `/api/v1/observations`
-- `backend/app/api/routes/hypotheses.py` — rewritten; `X-Warning-Anomalous` + `X-Warning-Falsification` headers
-- `backend/app/api/routes/frameworks.py` — new; full CRUD at `/api/v1/frameworks`; `X-Warning` header when anomalous_hypotheses empty
-- `backend/app/api/routes/sources.py` — sub-resource updated: `/{id}/claims` → `/{id}/observations`
-- `backend/app/api/routes/concepts.py` — `supporting_claim_ids` removed from Concept/Relationship schemas
-
-**Ingestion service** (`backend/app/services/ingestion.py`):
-- `ClaimDraft` → `ObservationDraft`; Claude extraction prompt updated for four-axis provenance schema
-- Extracted fields: `content`, `content_type`, `source_modality`, `epistemic_distance`, `collection_method`, `epistemic_status`, `page_ref`, `verbatim`
-
-**Migration** (`alembic/versions/0004_observation_hypothesis_framework.py`):
-- Creates 10 new enum types; drops `claim_type_enum`; replaces `hypothesis_status_enum`
-- Creates: `observations`, `observation_tags`, new `hypotheses`, 3 hypothesis join tables, `theoretical_frameworks`, 2 framework join tables
-- Drops: `claims`, `claim_tags`, `concept_supporting_claims`, `relationship_supporting_claims`, old `hypotheses`, all old hypothesis join tables
-
-**Known follow-on:** Concept layer — `concept_supporting_claims` was dropped in this migration. The ConceptRelationship graph will gain richer observation anchoring in a future phase.
-
-**Note on `import_excel.py`:** Still references old Claim schema. Needs its own refactor pass to map legacy Excel columns to the Observation model before re-import.
+- `src/pages/GraphView.tsx` — Cytoscape.js graph at `/graph`
+- Node colour by concept type; edge colour/style by relationship type; `anomalous_given` edges in loud red dashed stroke
+- Filter bar: concept type, relationship type, anomalous-only toggle
+- Click-to-highlight neighbourhood + DetailPanel slide-in
+- Cose force-directed layout
 
 ### Chat 8 — Hypothesis Workspace
-- **`src/components/HypothesisDetail.tsx`** — full hypothesis detail/edit page at `/hypotheses/:id`
-  - Inline editing of label, description, notes, framework, status, assumed ontologies
-  - Two claim slots: **Supporting** (evidence in favour), **Anomalous** (evidence it cannot explain)
-  - `ClaimAdder` component: debounced full-text search across the claim corpus (300 ms), filters out already-linked claims, shows epistemic status + claim type badges + source title inline
-  - `ClaimRow` component: anomalous claims rendered with red tint background and border to keep the anti-bias signal prominent; per-row remove button
-  - Optimistic save via `updateHypothesis`; delete with navigate-back
-  - `HypothesisStatusBadge` added to `ui.tsx`
-- **`src/components/AddHypothesisModal.tsx`** — creation modal launched from `HypothesisList`; sets label, framework, status, assumed ontologies (multi-select toggle chips), description, notes; navigates to detail on success
-- **`src/pages/HypothesisList.tsx`** — wired up `AddHypothesisModal` and row-click navigation to detail
-- **`backend/app/models/synthesis.py`** — fixed `HypothesisCreate`, `HypothesisUpdate`, `HypothesisList`, `HypothesisRead`, `EpistemicNoteCreate` to use `uuid.UUID` for all ID fields (was `int`)
-- **`src/api/index.ts`** — added `createHypothesis`, `updateHypothesis`, `deleteHypothesis`, `getHypothesis` typed API calls
-- **`src/types/index.ts`** — added `HypothesisRead`, `HypothesisCreate`, `HypothesisUpdate`, `HypothesisStatus`, `HypothesisFramework`, `AssumedOntology` types
-- **`src/App.tsx`** — added `/hypotheses/:id` route → `<HypothesisDetail />`
+- `src/components/HypothesisDetail.tsx` — inline editing, supporting/anomalous observation slots, ClaimAdder with debounced search
+- `src/components/AddHypothesisModal.tsx` — creation modal
+- `src/pages/HypothesisList.tsx` — wired up modal + row-click navigation
 
-### Phase B — Frontend refactor
+### Phase A — Backend Data Model Refactor
+- `Claim` → `Observation` with four-axis epistemic provenance (`content_type`, `source_modality`, `epistemic_distance`, `collection_method`)
+- `Hypothesis` → `{Hypothesis, TheoreticalFramework}`; `TheoreticalFramework` groups hypotheses; both require anomalous entries
+- New routes: `observations.py`, `frameworks.py`; rewritten `hypotheses.py`
+- `alembic/versions/0004_observation_hypothesis_framework.py`: full schema replacement
 
-- **`src/types/index.ts`** — replaced `ClaimRead`, `ClaimType`, `EpistemicStatus` (old), `HypothesisList/Read/Create/Update` (old) with full `ObservationRead/Create/Update`, new `HypothesisList/Read/Create/Update`, `TheoreticalFrameworkList/Read/Create/Update`, and all supporting enums (`ObservationEpistemicStatus`, `ContentType`, `SourceModality`, `EpistemicDistance`, `CollectionMethod`, `HypothesisType`, `HypothesisStatus`, `ConfidenceLevel`, `FrameworkStatus`, `CorroborationLevel`)
-- **`src/api/index.ts`** — removed all Claim functions; added `getObservations`, `getSourceObservations`, `getReviewQueue`, `reviewObservation`, `createObservation`, `updateObservation`; rewrote hypothesis functions; added `getFrameworks`, `getFramework`, `createFramework`, `updateFramework`, `deleteFramework`
-- **`src/components/ui.tsx`** — removed `EpistemicBadge`, `ClaimTypeBadge`, old `HypothesisStatusBadge`; added `ObservationEpistemicBadge`, `ContentTypeBadge`, `CollectionMethodBadge`, `HypothesisTypeBadge`, `HypothesisStatusBadge` (new values), `FrameworkStatusBadge`, `ConfidenceBadge`
-- **`src/pages/ObservationList.tsx`** — new page at `/observations`; replaces ClaimList; filter bar covers epistemic_status, content_type, epistemic_distance, collection_method, ai_extracted, unreviewed; inline edit of epistemic_status + content_type
-- **`src/pages/ReviewQueue.tsx`** — rewritten for `ObservationRead`; review card shows all four classification axes as read-only badges with reviewer override of epistemic_status + content_type
-- **`src/pages/HypothesisList.tsx`** — updated to new `HypothesisList` type; shows `HypothesisTypeBadge`, `HypothesisStatusBadge`, `ConfidenceBadge`, supporting/anomalous observation counts
-- **`src/components/HypothesisDetail.tsx`** — major rewrite; `ObservationAdder` replaces `ClaimAdder`; new fields `hypothesis_type`, `falsification_condition`, `scope`, `confidence_level`; amber warning banner when `falsification_condition` is empty; parent/competing hypothesis read-only display
-- **`src/components/AddHypothesisModal.tsx`** — added `hypothesis_type` (required), `falsification_condition`, `confidence_level`; removed `required_assumptions`
-- **`src/pages/FrameworkList.tsx`** — new list page at `/frameworks`; shows `FrameworkStatusBadge`, `ConfidenceBadge`, core/anomalous hypothesis counts; anomalous=0 warning
-- **`src/components/AddFrameworkModal.tsx`** — creation modal with label, framework_type, status, confidence_level, assumed_ontologies, description, notes
-- **`src/pages/FrameworkDetail.tsx`** — detail page at `/frameworks/:id`; inline-editable scalar fields; `HypothesisAdder` for core and anomalous hypothesis slots; amber warning banner if no anomalous hypotheses declared
-- **`src/components/AddObservationModal.tsx`** — replaces AddClaimModal; all four classification axes required; aggregate fields (sample_n, sample_size_tier, sampling_method, inclusion_criteria_documented) shown conditionally when epistemic_distance=aggregated
-- **`src/pages/SourceDetail.tsx`** — updated to use `getSourceObservations`; renders `ObservationRead` rows with new badges; stat label "Observations"; uses `AddObservationModal`
-- **`src/pages/SourceList.tsx`** — updated `claim_count` → `observation_count`
-- **`src/pages/GraphView.tsx`** — removed `supporting_claim_ids` node sizing (concept observation anchoring is a planned follow-on phase); nodes now equal size
-- **`src/components/Shell.tsx`** — nav updated: `/observations` (🔭), `/frameworks` (🧩) added; `/claims` removed
-- **`src/App.tsx`** — routes updated: `/observations` → `ObservationList`; `/frameworks` → `FrameworkList`; `/frameworks/:id` → `FrameworkDetail`
+### Phase B — Frontend Refactor
+- All Claim → Observation references updated throughout
+- New pages: `ObservationList`, `FrameworkList`, `FrameworkDetail`
+- New components: `AddObservationModal`, `AddFrameworkModal`; updated `HypothesisDetail` for Observation model
+- New badges: `ObservationEpistemicBadge`, `ContentTypeBadge`, `CollectionMethodBadge`, `HypothesisTypeBadge`, `FrameworkStatusBadge`, `ConfidenceBadge`
 
-**Note on `import_excel.py`:** Still references old Claim schema. Needs a refactor pass to map legacy Excel columns to the Observation model before re-import can happen.
+### Phase C — Backend: source-type schema refactor, Case model, v2 migration
+- `backend/app/models/enums.py`: removed `SourceType` (old values), `AccountContext`, `CorroborationLevel`, `ContentType`, `SourceModality`, `EpistemicDistance`, `CollectionMethod`, `SampleSizeTier`, `SamplingMethod`; added `SourceType` v2 (`case_report`, `empirical_study`, `review_paper`, `theoretical`), `ObservationSourceType`, `CasesIncluded`, `ExtractionMethod`, and all 27 case-report field enums
+- `backend/app/models/corpus.py`: removed `Account` model and all account-related Pydantic schemas; added `Case` model (10 sections, ~100 fields, JSONB multi-selects); updated `Observation` model (removed four-axis provenance fields, added corpus-derived fields, `source_id` now nullable); updated `Source` to add `cases` relationship; updated all Pydantic schemas to match (`SourceCreate` no longer takes `account_detail`; `SourceList`/`SourceRead` add `case_count`; `ObservationCreate`/`Update`/`Read`/`Review` reflect new schema)
+- `backend/alembic/versions/0006_v2_schema.py`: drops old tables (`accounts`, `observations`, `observation_tags`, hypothesis observation join tables), drops old enum types (8 types), replaces `source_type_enum` with v2 values, creates 27 new case-layer enum types, creates `cases` table, recreates `observations` with corpus-derived schema, recreates `observation_tags` and hypothesis join tables
+- `backend/app/api/routes/observations.py`: updated for new `Observation` schema; staleness flag computed at read time; corpus-derived validation on `POST`
+- `backend/app/api/routes/sources.py`: removed `Account` import and creation logic; `_to_source_list`/`_to_source_read` now returns `case_count` for `case_report` sources, `observation_count` for others
+- `backend/app/api/routes/ingest.py` + `backend/app/services/ingestion.py`: removed four deleted enum imports; `ObservationDraft` simplified to `content`, `epistemic_status`, `page_ref`, `verbatim`; AI extraction prompt updated to reflect new observation schema
+
+---
+
+## Phase C — Implementation Instructions
+
+**Scope:** Replace the current broad-enum observation model with source-type-discriminated schemas. Introduce the `Case` model. Drop existing observations (no migration). Remove `Account`.
+
+**Read this before writing any code.** The v2 schema is a breaking change at the database layer. Work top-down: enums → models → migration → routes. Do not attempt to migrate existing observation data — drop and recreate.
+
+### Step 1 — `backend/app/models/enums.py`
+
+**Remove** these enums (no longer used after v2):
+- `ContentType`, `SourceModality`, `EpistemicDistance`, `CollectionMethod`
+
+**Add** `SourceType`:
+```python
+class SourceType(str, Enum):
+    CASE_REPORT = "case_report"
+    EMPIRICAL_STUDY = "empirical_study"
+    REVIEW_PAPER = "review_paper"
+    THEORETICAL = "theoretical"
+```
+
+**Add** `ObservationSourceType`:
+```python
+class ObservationSourceType(str, Enum):
+    LITERATURE = "literature"
+    CORPUS_DERIVED = "corpus_derived"
+```
+
+**Add** all case report enums. Every enum below maps directly to the case report schema field of the same name:
+
+```python
+class ExtractionMethod(str, Enum):
+    MANUAL = "manual"
+    AI_ASSISTED = "ai_assisted"
+    IMPORTED = "imported"
+
+class EventDatePrecision(str, Enum):
+    EXACT = "exact"
+    MONTH_AND_YEAR = "month_and_year"
+    YEAR_ONLY = "year_only"
+    DECADE = "decade"
+    UNKNOWN = "unknown"
+
+class SleepWakeState(str, Enum):
+    FULLY_AWAKE = "fully_awake"
+    DROWSY = "drowsy"
+    HYPNAGOGIC = "hypnagogic"
+    HYPNOPOMPIC = "hypnopompic"
+    ASLEEP = "asleep"
+    UNKNOWN = "unknown"
+
+class PhysicalLocationType(str, Enum):
+    BEDROOM = "bedroom"
+    OTHER_INDOOR = "other_indoor"
+    VEHICLE = "vehicle"
+    OUTDOOR_RURAL = "outdoor_rural"
+    OUTDOOR_URBAN = "outdoor_urban"
+    UNKNOWN = "unknown"
+
+class AloneatOnset(str, Enum):
+    ALONE = "alone"
+    OTHERS_PRESENT = "others_present"
+    UNKNOWN = "unknown"
+
+class PsychologicalStateType(str, Enum):
+    NORMAL = "normal"
+    STRESSED = "stressed"
+    ANXIOUS = "anxious"
+    DEPRESSED = "depressed"
+    ELATED = "elated"
+    DISSOCIATED = "dissociated"
+    UNKNOWN = "unknown"
+
+class AlteredStateDepth(str, Enum):
+    NONE = "none"
+    MILD = "mild"
+    MODERATE = "moderate"
+    DEEP = "deep"
+    UNKNOWN = "unknown"
+
+class AlteredStateType(str, Enum):  # multi-select
+    DROWSINESS = "drowsiness"
+    INTOXICATION = "intoxication"
+    MEDITATION = "meditation"
+    DISSOCIATION = "dissociation"
+    FEVER = "fever"
+    SENSORY_DEPRIVATION = "sensory_deprivation"
+    OTHER = "other"
+
+class EventDuration(str, Enum):
+    SECONDS = "seconds"
+    MINUTES = "minutes"
+    UNDER_ONE_HOUR = "under_one_hour"
+    ONE_TO_SEVERAL_HOURS = "one_to_several_hours"
+    UNKNOWN = "unknown"
+
+class PresenceAbsenceUnknown(str, Enum):
+    NONE = "none"
+    YES = "yes"
+    UNKNOWN = "unknown"
+
+class ParalysisExtent(str, Enum):
+    NONE = "none"
+    PARTIAL = "partial"
+    FULL = "full"
+    UNKNOWN = "unknown"
+
+class EntityCount(str, Enum):
+    ONE = "one"
+    TWO_TO_FIVE = "two_to_five"
+    MORE_THAN_FIVE = "more_than_five"
+    UNKNOWN = "unknown"
+
+class EntityType(str, Enum):  # multi-select
+    GREY = "grey"
+    NORDIC = "nordic"
+    REPTILIAN = "reptilian"
+    SHADOW = "shadow"
+    ROBOTIC = "robotic"
+    INSECTOID = "insectoid"
+    HYBRID = "hybrid"
+    LUMINOUS = "luminous"
+    AMORPHOUS = "amorphous"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+class EntityCommunicationModality(str, Enum):  # multi-select
+    VERBAL_AUDITORY = "verbal_auditory"
+    TELEPATHIC = "telepathic"
+    VISUAL = "visual"
+    GESTURAL = "gestural"
+    EMOTIONAL_TRANSFER = "emotional_transfer"
+    OTHER = "other"
+
+class EntityCommunicationContentType(str, Enum):  # multi-select
+    EDUCATIONAL = "educational"
+    WARNING = "warning"
+    MISSION = "mission"
+    PERSONAL = "personal"
+    PROCEDURAL = "procedural"
+    UNINTELLIGIBLE = "unintelligible"
+    OTHER = "other"
+
+class PhysiologicalSymptom(str, Enum):  # multi-select
+    CHEST_PRESSURE = "chest_pressure"
+    VISUAL_HALLUCINATIONS = "visual_hallucinations"
+    AUDITORY_HALLUCINATIONS = "auditory_hallucinations"
+    NAUSEA = "nausea"
+    PAIN = "pain"
+    VIBRATION = "vibration"
+    HEAT_OR_COLD = "heat_or_cold"
+    PARALYSIS = "paralysis"
+    PALPITATIONS = "palpitations"
+    OTHER = "other"
+    NONE = "none"
+
+class EmotionalValence(str, Enum):  # multi-select
+    TERROR = "terror"
+    ANXIETY = "anxiety"
+    AWE = "awe"
+    CALM = "calm"
+    JOY = "joy"
+    CONFUSION = "confusion"
+    SADNESS = "sadness"
+    NONE_REPORTED = "none_reported"
+    UNKNOWN = "unknown"
+
+class CorroborationLevelV2(str, Enum):
+    TESTIMONY_ONLY = "testimony_only"
+    CORROBORATED_BY_WITNESS = "corroborated_by_witness"
+    CORROBORATED_BY_PHYSICAL_EVIDENCE = "corroborated_by_physical_evidence"
+    CORROBORATED_BY_BOTH = "corroborated_by_both"
+    UNKNOWN = "unknown"
+
+class MemoryRetrievalMethod(str, Enum):  # multi-select
+    SPONTANEOUS_RECALL = "spontaneous_recall"
+    HYPNOTIC_REGRESSION = "hypnotic_regression"
+    GUIDED_IMAGERY = "guided_imagery"
+    THERAPY = "therapy"
+    SELF_HYPNOSIS = "self_hypnosis"
+    DREAM_RECALL = "dream_recall"
+    JOURNALING = "journaling"
+    INVESTIGATOR_INTERVIEW = "investigator_interview"
+    UNKNOWN = "unknown"
+
+class AccountConsistency(str, Enum):
+    NOT_ASSESSED = "not_assessed"
+    CONSISTENT = "consistent"
+    MINOR_VARIATIONS = "minor_variations"
+    SIGNIFICANT_VARIATIONS = "significant_variations"
+    CONTRADICTORY = "contradictory"
+
+class EducationLevel(str, Enum):
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    TERTIARY = "tertiary"
+    POSTGRADUATE = "postgraduate"
+    NOT_REPORTED = "not_reported"
+
+class MaritalStatus(str, Enum):
+    SINGLE = "single"
+    MARRIED = "married"
+    PARTNERED = "partnered"
+    DIVORCED = "divorced"
+    WIDOWED = "widowed"
+    NOT_REPORTED = "not_reported"
+
+class Religiosity(str, Enum):
+    NONE = "none"
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    NOT_REPORTED = "not_reported"
+
+class PriorInterestLevel(str, Enum):
+    NONE = "none"
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    NOT_REPORTED = "not_reported"
+
+class HistoryPresence(str, Enum):
+    NONE = "none"
+    SUSPECTED = "suspected"
+    CONFIRMED = "confirmed"
+    NOT_REPORTED = "not_reported"
+
+class MotivationalFactors(str, Enum):
+    NONE_APPARENT = "none_apparent"
+    SUSPECTED = "suspected"
+    CONFIRMED = "confirmed"
+    NOT_ASSESSED = "not_assessed"
+
+class RepeatExperiencer(str, Enum):
+    FIRST_EXPERIENCE = "first_experience"
+    REPEAT_EXPERIENCER = "repeat_experiencer"
+    NOT_REPORTED = "not_reported"
+
+class ExperiencerSex(str, Enum):
+    MALE = "male"
+    FEMALE = "female"
+    INTERSEX = "intersex"
+    NOT_REPORTED = "not_reported"
+
+class CasesIncluded(str, Enum):
+    ALL = "all"
+    FILTERED_SUBSET = "filtered_subset"
+
+class PsychometricPresence(str, Enum):
+    NO = "no"
+    YES = "yes"
+    UNKNOWN = "unknown"
+
+class PsychometricLevel(str, Enum):
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+
+class ClinicalLevel(str, Enum):
+    NONE = "none"
+    SUBCLINICAL = "subclinical"
+    CLINICAL = "clinical"
+
+class ClinicalPresence(str, Enum):
+    NONE = "none"
+    SUBCLINICAL = "subclinical"
+    CLINICAL_DIAGNOSIS = "clinical_diagnosis"
+
+class CommunityType(str, Enum):  # multi-select
+    UFO_GROUP = "ufo_group"
+    THERAPY = "therapy"
+    RELIGION = "religion"
+    ONLINE_COMMUNITY = "online_community"
+    RESEARCH_PARTICIPATION = "research_participation"
+    OTHER = "other"
+```
+
+### Step 2 — `backend/app/models/corpus.py`
+
+**Remove** the `Account` model entirely.
+
+**Add `source_type` to `Source`:**
+```python
+source_type: Mapped[SourceType] = mapped_column(
+    Enum(SourceType, name="source_type_enum", create_type=False,
+         values_callable=lambda x: [e.value for e in x]),
+    nullable=False,
+)
+```
+
+**Add the `Case` model** after `Source`. All fields nullable except `source_id` and `case_label`. Multi-select fields use `JSONB`. Use `Optional[str]` for free-text fields and `Optional[EnumType]` for single-select enums. Example pattern for a JSONB multi-select:
+
+```python
+entity_types: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+```
+
+Full field list (all nullable unless noted):
+
+```python
+class Case(Base, TimestampMixin):
+    __tablename__ = "cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
+    case_label: Mapped[str] = mapped_column(String(200), nullable=False)
+    extraction_method: Mapped[Optional[ExtractionMethod]] = ...
+    extraction_date: Mapped[Optional[date]] = ...
+    extracted_by: Mapped[Optional[str]] = mapped_column(String(200))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Section 2 — Context & Demographics
+    experiencer_nationality: Mapped[Optional[str]] = mapped_column(String(100))
+    experiencer_ethnicity: Mapped[Optional[str]] = mapped_column(String(100))
+    experiencer_age_at_event: Mapped[Optional[int]] = ...
+    experiencer_sex: Mapped[Optional[ExperiencerSex]] = ...
+    experiencer_gender: Mapped[Optional[str]] = mapped_column(String(100))
+    experiencer_occupation: Mapped[Optional[str]] = mapped_column(String(200))
+    education_level: Mapped[Optional[EducationLevel]] = ...
+    marital_status: Mapped[Optional[MaritalStatus]] = ...
+    religiosity: Mapped[Optional[Religiosity]] = ...
+
+    # Section 3 — Background History
+    prior_ufo_interest: Mapped[Optional[PriorInterestLevel]] = ...
+    prior_paranormal_belief: Mapped[Optional[PriorInterestLevel]] = ...
+    cultural_media_exposure_to_aae: Mapped[Optional[PriorInterestLevel]] = ...
+    childhood_trauma_history: Mapped[Optional[HistoryPresence]] = ...
+    childhood_abuse_history: Mapped[Optional[HistoryPresence]] = ...
+    surgical_history_present: Mapped[Optional[HistoryPresence]] = ...
+    surgical_history_detail: Mapped[Optional[str]] = mapped_column(Text)
+    neuropsychiatric_history_present: Mapped[Optional[HistoryPresence]] = ...
+    neuropsychiatric_history_detail: Mapped[Optional[str]] = mapped_column(Text)
+    substance_use_present: Mapped[Optional[HistoryPresence]] = ...
+    substance_use_detail: Mapped[Optional[str]] = mapped_column(Text)
+    motivational_factors_present: Mapped[Optional[MotivationalFactors]] = ...
+    motivational_factors_detail: Mapped[Optional[str]] = mapped_column(Text)
+    repeat_experiencer: Mapped[Optional[RepeatExperiencer]] = ...
+
+    # Section 4 — Onset Conditions
+    event_date: Mapped[Optional[date]] = ...
+    event_date_precision: Mapped[Optional[EventDatePrecision]] = ...
+    event_time_of_day: Mapped[Optional[str]] = mapped_column(String(50))  # enum: early_morning|morning|afternoon|evening|night|unknown
+    sleep_wake_state_at_onset: Mapped[Optional[SleepWakeState]] = ...
+    physical_location_type: Mapped[Optional[PhysicalLocationType]] = ...
+    physical_location_detail: Mapped[Optional[str]] = mapped_column(Text)
+    alone_at_onset: Mapped[Optional[AloneatOnset]] = ...
+    witness_count: Mapped[Optional[int]] = ...
+    environmental_stimuli_present: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    environmental_stimuli_detail: Mapped[Optional[str]] = mapped_column(Text)
+    psychological_state_preceding: Mapped[Optional[PsychologicalStateType]] = ...
+    psychological_state_detail: Mapped[Optional[str]] = mapped_column(Text)
+    altered_state_at_onset: Mapped[Optional[AlteredStateDepth]] = ...
+    altered_state_types: Mapped[Optional[list]] = mapped_column(JSONB)  # AlteredStateType[]
+
+    # Section 5 — Phenomenological Content
+    duration_of_experience: Mapped[Optional[EventDuration]] = ...
+    missing_time_reported: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    missing_time_duration: Mapped[Optional[str]] = mapped_column(String(200))
+    paralysis_reported: Mapped[Optional[ParalysisExtent]] = ...
+    perceived_physical_transport: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    out_of_body_sensation: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    floating_sensation: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    tunnel_or_passage_sensation: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    entity_presence: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    entity_count: Mapped[Optional[EntityCount]] = ...
+    entity_types: Mapped[Optional[list]] = mapped_column(JSONB)  # EntityType[]
+    entity_types_detail: Mapped[Optional[str]] = mapped_column(Text)
+    entity_communication_present: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    entity_communication_modality: Mapped[Optional[list]] = mapped_column(JSONB)  # EntityCommunicationModality[]
+    entity_communication_content_type: Mapped[Optional[list]] = mapped_column(JSONB)  # EntityCommunicationContentType[]
+    educational_or_mission_messaging: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    medical_procedure_motif: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    medical_procedure_detail: Mapped[Optional[str]] = mapped_column(Text)
+    reproductive_or_sexual_motif: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    reproductive_motif_detail: Mapped[Optional[str]] = mapped_column(Text)
+    craft_or_vehicle_reported: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    craft_description: Mapped[Optional[str]] = mapped_column(Text)
+    physical_environment_changes: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    physical_environment_changes_detail: Mapped[Optional[str]] = mapped_column(Text)
+    event_sequence_described: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    event_sequence_detail: Mapped[Optional[str]] = mapped_column(Text)
+    physiological_symptoms: Mapped[Optional[list]] = mapped_column(JSONB)  # PhysiologicalSymptom[]
+    physiological_symptoms_detail: Mapped[Optional[str]] = mapped_column(Text)
+    emotional_valence_during_event: Mapped[Optional[list]] = mapped_column(JSONB)  # EmotionalValence[]
+    emotional_valence_detail: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Section 6 — Physical & Physiological Evidence
+    physical_marks_present: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    physical_marks_detail: Mapped[Optional[str]] = mapped_column(Text)
+    physical_marks_medically_examined: Mapped[Optional[PsychometricPresence]] = ...
+    environmental_physical_evidence: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    environmental_physical_evidence_detail: Mapped[Optional[str]] = mapped_column(Text)
+    independent_corroboration_present: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    independent_corroboration_detail: Mapped[Optional[str]] = mapped_column(Text)
+    eeg_or_neurological_data_available: Mapped[Optional[PsychometricPresence]] = ...
+    eeg_data_detail: Mapped[Optional[str]] = mapped_column(Text)
+    blood_or_toxicology_data_available: Mapped[Optional[PsychometricPresence]] = ...
+    blood_data_detail: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Section 7 — Psychological Profile
+    fantasy_proneness_assessed: Mapped[Optional[PsychometricPresence]] = ...
+    fantasy_proneness_score: Mapped[Optional[float]] = ...
+    fantasy_proneness_instrument: Mapped[Optional[str]] = mapped_column(String(200))
+    hypnotic_suggestibility_assessed: Mapped[Optional[PsychometricPresence]] = ...
+    hypnotic_suggestibility_score: Mapped[Optional[float]] = ...
+    hypnotic_suggestibility_instrument: Mapped[Optional[str]] = mapped_column(String(200))
+    boundary_thinness_assessed: Mapped[Optional[PsychometricPresence]] = ...
+    boundary_thinness_score: Mapped[Optional[float]] = ...
+    boundary_thinness_instrument: Mapped[Optional[str]] = mapped_column(String(200))
+    dissociation_assessed: Mapped[Optional[PsychometricPresence]] = ...
+    dissociation_score: Mapped[Optional[float]] = ...
+    dissociation_instrument: Mapped[Optional[str]] = mapped_column(String(200))
+    ptsd_symptoms_assessed: Mapped[Optional[PsychometricPresence]] = ...
+    ptsd_symptoms_present: Mapped[Optional[ClinicalLevel]] = ...
+    ptsd_instrument: Mapped[Optional[str]] = mapped_column(String(200))
+    psychopathology_screened: Mapped[Optional[PsychometricPresence]] = ...
+    psychopathology_findings: Mapped[Optional[ClinicalPresence]] = ...
+    psychopathology_detail: Mapped[Optional[str]] = mapped_column(Text)
+    need_for_meaning_assessed: Mapped[Optional[PsychometricPresence]] = ...
+    need_for_meaning_level: Mapped[Optional[PsychometricLevel]] = ...
+    self_escape_motivation_assessed: Mapped[Optional[PsychometricPresence]] = ...
+    self_escape_motivation_level: Mapped[Optional[PsychometricLevel]] = ...
+
+    # Section 8 — Memory & Retrieval
+    memory_retrieval_method: Mapped[Optional[list]] = mapped_column(JSONB)  # MemoryRetrievalMethod[]
+    hypnosis_used: Mapped[Optional[PsychometricPresence]] = ...
+    hypnotist_identity: Mapped[Optional[str]] = mapped_column(String(200))
+    investigator_or_therapist_involved: Mapped[Optional[PsychometricPresence]] = ...
+    investigator_detail: Mapped[Optional[str]] = mapped_column(Text)
+    account_consistency_over_time: Mapped[Optional[AccountConsistency]] = ...
+    number_of_accounts_on_record: Mapped[Optional[int]] = ...
+
+    # Section 9 — Aftermath
+    positive_transformation_reported: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    positive_transformation_detail: Mapped[Optional[str]] = mapped_column(Text)
+    negative_psychological_aftermath: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    negative_aftermath_detail: Mapped[Optional[str]] = mapped_column(Text)
+    ongoing_contact_reported: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    ongoing_contact_detail: Mapped[Optional[str]] = mapped_column(Text)
+    changed_worldview_reported: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    worldview_change_detail: Mapped[Optional[str]] = mapped_column(Text)
+    sought_community_or_support: Mapped[Optional[PresenceAbsenceUnknown]] = ...
+    community_type: Mapped[Optional[list]] = mapped_column(JSONB)  # CommunityType[]
+
+    # Section 10 — Corroboration Quality
+    corroboration_level: Mapped[Optional[CorroborationLevelV2]] = ...
+    case_quality_notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Relationships
+    source: Mapped["Source"] = relationship("Source", back_populates="cases")
+```
+
+Add `cases` back-populates to `Source`:
+```python
+cases: Mapped[List["Case"]] = relationship("Case", back_populates="source", cascade="all, delete-orphan")
+```
+
+### Step 3 — `backend/app/models/synthesis.py`
+
+**Update `Observation` model** — remove four-axis provenance fields, add corpus-derived fields:
+
+Remove: `content_type`, `source_modality`, `epistemic_distance`, `collection_method`, `sample_n`, `sample_size_tier`, `sampling_method`, `inclusion_criteria_documented`.
+
+Add:
+```python
+observation_source_type: Mapped[ObservationSourceType] = mapped_column(
+    Enum(ObservationSourceType, name="observation_source_type_enum", create_type=False,
+         values_callable=lambda x: [e.value for e in x]),
+    nullable=False, server_default="literature",
+)
+authored_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+query_definition: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+analysis_tool: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+corpus_snapshot_date: Mapped[Optional[date]] = mapped_column(nullable=True)
+case_count_at_snapshot: Mapped[Optional[int]] = mapped_column(nullable=True)
+cases_included: Mapped[Optional[CasesIncluded]] = mapped_column(
+    Enum(CasesIncluded, name="cases_included_enum", create_type=False,
+         values_callable=lambda x: [e.value for e in x]),
+    nullable=True,
+)
+case_filter_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+```
+
+`staleness_flag` is computed at read time in the API route (not stored); see Phase D.
+
+All other synthesis models (`Hypothesis`, `TheoreticalFramework`, `Concept`, `ConceptRelationship`, `EpistemicNote`) are unchanged.
+
+### Step 4 — `alembic/versions/0005_v2_schema.py`
+
+Operations in order:
+
+1. Drop tables: `observations`, `observation_tags`, `observation_review`, `accounts`
+2. Drop enum types: `content_type_enum`, `source_modality_enum`, `epistemic_distance_enum`, `collection_method_enum`, `sample_size_tier_enum`, `sampling_method_enum`, `corroboration_level_enum`
+3. Create new enum types for all enums added in Step 1 (use `CREATE TYPE ... AS ENUM`)
+4. Add column `source_type` (type `source_type_enum`) to `sources` table, `NOT NULL` with a default of `'empirical_study'` for existing rows; then remove the default
+5. Create `cases` table with all columns from the `Case` model
+6. Recreate `observations` table with new schema (remove four-axis provenance columns, add corpus-derived columns)
+7. Recreate `observation_tags` table
+8. Recreate `observation_review` table
+
+Do not touch any synthesis tables (`hypotheses`, `theoretical_frameworks`, `concepts`, `concept_relationships`, `epistemic_notes`, or their join tables).
+
+---
+
+## Phase D — Implementation Instructions
+
+**Scope:** Case CRUD API routes and CSV export endpoint.
+
+### `backend/app/api/routes/cases.py`
+
+Pydantic schemas needed: `CaseCreate`, `CaseUpdate`, `CaseRead`, `CaseList` (lightweight, for list view).
+
+Routes:
+- `GET /api/v1/cases` — paginated list; filter params: `source_id`, `entity_presence`, `sleep_wake_state_at_onset`, `paralysis_reported`, `hypnosis_used`, `corroboration_level`, `repeat_experiencer`, `q` (full-text on `case_label` + `notes`)
+- `GET /api/v1/cases/{id}` — full `CaseRead`
+- `POST /api/v1/cases` — create; returns `CaseRead`
+- `PATCH /api/v1/cases/{id}` — partial update; returns `CaseRead`
+- `DELETE /api/v1/cases/{id}` — 204
+- `GET /api/v1/sources/{id}/cases` — cases for a source; returns paginated `CaseList`
+
+### `backend/app/api/routes/export.py`
+
+- `GET /api/v1/cases/export`
+- Accepts same filter params as case list
+- Returns CSV with `Content-Disposition: attachment; filename="cases_export_{date}.csv"`
+- Response headers include `X-Corpus-Snapshot-Date` (today's date) and `X-Case-Count` (number of rows exported)
+- All columns included; JSONB arrays serialised as pipe-separated strings (e.g. `"grey|nordic"`)
+- Streamed response using `StreamingResponse` with a CSV generator
+
+### `backend/app/api/routes/observations.py`
+
+Add staleness flag logic to the observation read path:
+```python
+# After fetching observation from DB:
+staleness_flag = False
+if obs.observation_source_type == ObservationSourceType.CORPUS_DERIVED:
+    if obs.case_count_at_snapshot is not None:
+        current_count = db.query(func.count(Case.id)).scalar()
+        staleness_flag = current_count > obs.case_count_at_snapshot * 1.2
+```
+
+Include `staleness_flag` in `ObservationRead` as a computed field (not stored).
+
+Update `POST /api/v1/observations` to validate corpus-derived fields: when `observation_source_type = corpus_derived`, require `query_definition`, `corpus_snapshot_date`, `case_count_at_snapshot`; `source_id` must be null.
+
+### `backend/app/api/routes/sources.py`
+
+- `POST /api/v1/sources`: `source_type` is now required
+- `GET /api/v1/sources/{id}`: response includes `case_count` (count of linked cases) when `source_type == case_report`, `observation_count` otherwise
+
+### `backend/app/main.py`
+
+Register new routers:
+```python
+from app.api.routes import cases, export
+app.include_router(cases.router, prefix="/api/v1")
+app.include_router(export.router, prefix="/api/v1")
+```
+
+---
+
+## Phase E — Implementation Instructions
+
+**Scope:** AI ingestion pipeline for case report sources.
+
+### `backend/app/services/ingestion.py`
+
+Add `CaseDraft` dataclass mirroring `Case` with all fields `Optional`.
+
+Add `extract_case_from_pdf(source: Source, raw_text: str, db: Session) -> IngestionResult`:
+- Sends raw text to Claude API with the case extraction prompt (see below)
+- Parses JSON response into a `CaseDraft`
+- Inserts a `Case` record with `extraction_method = ai_assisted`, all fields from draft, `reviewed = False`
+- Returns `IngestionResult`
+
+**Case extraction prompt principles** (encode in the prompt string):
+- You are extracting structured data from a case report of an anomalous abduction experience
+- Populate ONLY fields that are explicitly stated in the source text
+- Leave all other fields as null — do not infer, interpolate, or assume
+- For multi-select fields, return a JSON array of valid enum values
+- For enum fields, return the exact enum value string or null
+- If a value is ambiguous, set the field to null and add a note to the `notes` field
+- Do not add any information not present in the source text
+- Return a single JSON object matching the CaseDraft schema
+
+Update dispatch logic in `run_ingestion()`:
+```python
+if source.source_type == SourceType.CASE_REPORT:
+    return extract_case_from_pdf(source, raw_text, db)
+else:
+    return extract_observations_from_pdf(source, raw_text, db)
+```
+
+### `backend/app/api/routes/cases.py`
+
+Add review queue endpoints:
+- `GET /api/v1/cases/review-queue` — cases where `reviewed = False` and `extraction_method = ai_assisted`; ordered by `created_at` asc
+- `POST /api/v1/cases/{id}/review` — body: `{ accepted: bool, edits?: Partial<CaseUpdate> }`; if accepted, apply edits and set `reviewed = True`; if rejected, delete the case record
+
+Add `reviewed: bool` and `reviewed_by: Optional[str]` and `reviewed_at: Optional[datetime]` fields to the `Case` model and migration.
+
+---
+
+## Phase F — Implementation Instructions
+
+**Scope:** Frontend case browsing, entry, review, and export.
+
+### New files
+
+`src/pages/CaseList.tsx` — route `/cases`
+- Table: case label, source title, entity presence badge, sleep/wake state badge, corroboration level badge, created date
+- Filter bar: source (select), entity presence (select), sleep/wake state (select), hypnosis used (select), corroboration level (select), repeat experiencer (select), free-text search
+- Export button: calls `exportCases()` with active filters; shows confirmation modal with case count and snapshot date before downloading
+- Pagination
+
+`src/pages/CaseDetail.tsx` — route `/cases/:id`
+- Rendered in sections matching the schema (use section headings from the schema)
+- Each field: label, current value (rendered appropriately for type), inline edit on click
+- Multi-select enum fields: toggle chip groups
+- Single-select enum fields: dropdowns including explicit `unknown` / `none` options
+- Free-text fields: inline textarea
+- Score fields: number input with instrument name field alongside
+- Delete button with confirmation dialog
+- Back link to source
+
+`src/pages/CaseReviewQueue.tsx` — route `/cases/review`
+- Review cards for AI-extracted case drafts
+- Each card: case label, source title, all non-null extracted fields rendered in sections
+- Reviewer can edit any field before accepting
+- Accept / Reject buttons
+
+`src/components/AddCaseModal.tsx`
+- Minimal: case label (required), source selector (required, filtered to case_report sources only), extraction method (default: manual)
+- On create: navigate to `CaseDetail` for full field entry
+
+### Updated files
+
+`src/pages/SourceDetail.tsx`
+- When `source.source_type === 'case_report'`: show Cases tab (case list for this source, Add Case button, AI Ingest button); hide Observations tab
+- When other source types: unchanged
+
+`src/components/Shell.tsx`
+- Add nav entry: `CAS` → `/cases`
+- Add nav entry: `CRV` → `/cases/review` (case review queue)
+
+`src/App.tsx`
+- Add routes: `/cases` → `CaseList`, `/cases/review` → `CaseReviewQueue`, `/cases/:id` → `CaseDetail`
+
+`src/api/index.ts`
+- Add: `getCases(filters)`, `getCase(id)`, `createCase(data)`, `updateCase(id, data)`, `deleteCase(id)`, `getSourceCases(sourceId)`, `getCaseReviewQueue()`, `reviewCase(id, data)`, `exportCases(filters)` (returns blob, triggers download)
+
+`src/types/index.ts`
+- Add: `CaseRead`, `CaseCreate`, `CaseUpdate`, `CaseList` and all new case-layer enum types
+
+---
+
+## Phase G — Implementation Instructions
+
+**Scope:** Corpus-derived observation entry and staleness indicator.
+
+### `src/components/AddObservationModal.tsx`
+
+Add `observation_source_type` toggle at the top: `Literature` (default) | `Corpus-derived`.
+
+When `corpus_derived` is selected:
+- Hide: source selector, PDF-related fields
+- Show: `query_definition` (textarea, required), `analysis_tool` (text input), `corpus_snapshot_date` (date picker, required), `case_count_at_snapshot` (number, required), `cases_included` (select: all / filtered_subset), `case_filter_description` (textarea, shown when filtered_subset)
+- `authored_by` field (text input) visible for both modes
+
+### `src/pages/ObservationList.tsx`
+
+For corpus-derived observations where `staleness_flag === true`, show an amber `⚠ stale` badge alongside the observation. Tooltip on hover: "Computed against {case_count_at_snapshot} cases; corpus now has {current_count} cases."
+
+---
+
+## Phase H — Implementation Instructions
+
+**Scope:** Cleanup and smoke test.
+
+- Delete `backend/import_excel.py` (superseded; data dropped in migration)
+- Remove any remaining `Account` references in frontend (types, API calls, UI)
+- Remove four-axis provenance badge components from `src/components/ui.tsx` if unused: `ContentTypeBadge`, `CollectionMethodBadge`
+- Update CLAUDE.md architecture section if any details changed during implementation
+- Smoke test sequence:
+  1. Add a `case_report` source with PDF
+  2. Trigger AI ingestion → verify `CaseDraft` created
+  3. Review and accept in case review queue
+  4. Browse case in CaseList, open CaseDetail, edit a field
+  5. Export CSV with no filters; verify headers include snapshot date and case count
+  6. Add a `corpus_derived` observation manually, referencing the export
+  7. Link observation to a hypothesis as supporting evidence
+  8. Verify staleness flag appears after adding another case
 
 ---
 
@@ -339,9 +1022,6 @@ docker compose up backend
 
 # Backend + frontend
 docker compose --profile frontend up
-
-# Import Excel data
-docker compose run --rm backend python import_excel.py
 ```
 
 **Endpoints:**
@@ -354,14 +1034,16 @@ docker compose run --rm backend python import_excel.py
 
 ## Key Design Principles
 
-1. **Claims layer is non-negotiable.** Never collapse source → synthesis. The claim is where epistemic status lives.
+1. **Cases are not observations.** A case is a datum about a single experiencer. An observation is a derived claim about a pattern across cases. Never link cases directly to hypotheses — the aggregation step is required and epistemically meaningful.
 
-2. **Anomalies are signals.** The `anomalous_given` relationship type and required `anomalous_claims` on Hypothesis are the structural mechanisms for this. The UI surfaces the warning prominently.
+2. **Anomalies are structurally required.** `anomalous_observations` on `Hypothesis` and `anomalous_hypotheses` on `TheoreticalFramework` are not optional. The API emits `X-Warning` headers and the UI surfaces red/amber warnings when these are empty.
 
-3. **Confirmation bias is a structural risk.** Counter it at the schema level. `anomalous_claims` is required, not optional — enforced by both API warning header and frontend UI.
+3. **Confirmation bias is countered at the schema level.** Not by user discipline. The schema enforces it.
 
-4. **Epistemic transparency throughout.** Every claim carries provenance, epistemic status, and reviewer attribution.
+4. **Empty means unknown, not absent.** All case fields are nullable. Absence of a value means the information was not available in the source, not that the feature was absent. Confirmed absence is encoded as an explicit enum value (`none`, `not_reported`, etc.).
 
-5. **Ontological agnosticism at the infrastructure level.** The `assumed_ontologies` field makes paradigm assumptions explicit rather than encoding them into the schema.
+5. **The analysis layer lives outside the system.** The KMS collects and curates; external tools (R, Python) analyse. The export endpoint is the formal boundary. Corpus-derived observations re-enter the system with full provenance so the analytical step is auditable.
 
-6. **Disciplinary lens separation.** Claims and sources are tagged by disciplinary frame so the neuroscience literature can be queried independently of the anomalist literature.
+6. **Epistemic transparency throughout.** Every observation carries its source type and provenance. Every corpus-derived observation carries the query that produced it and the snapshot it was computed against. Staleness is surfaced, not hidden.
+
+7. **Ontological agnosticism at the infrastructure level.** `assumed_ontologies` makes paradigm assumptions explicit and queryable rather than encoding them into the schema.
