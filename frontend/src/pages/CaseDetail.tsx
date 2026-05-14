@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCase, updateCase, deleteCase } from '../api';
+import { getCase, updateCase, deleteCase, reviewCase } from '../api';
 import type {
   CaseRead, CaseUpdate,
   ExperiencerSex, EducationLevel, MaritalStatus, Religiosity,
@@ -257,6 +257,22 @@ export function CaseDetail() {
   const deleteMutation = useMutation({
     mutationFn: () => deleteCase(id!),
     onSuccess: () => navigate('/cases'),
+  });
+
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+
+  const acceptMutation = useMutation({
+    mutationFn: () => reviewCase(id!, { accepted: true }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['case', id] });
+      qc.invalidateQueries({ queryKey: ['case-review-queue'] });
+      qc.invalidateQueries({ queryKey: ['cases'] });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: () => reviewCase(id!, { accepted: false }),
+    onSuccess: () => navigate('/cases/review'),
   });
 
   if (isLoading) return <Shell><Spinner /></Shell>;
@@ -786,6 +802,52 @@ export function CaseDetail() {
                   <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
                     {c.reviewed_at.slice(0, 10)}
                   </span>
+                )}
+                {!c.reviewed && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                    {!showRejectConfirm ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          disabled={acceptMutation.isPending || rejectMutation.isPending}
+                          onClick={() => acceptMutation.mutate()}
+                        >
+                          {acceptMutation.isPending ? 'accepting…' : 'accept'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={acceptMutation.isPending || rejectMutation.isPending}
+                          onClick={() => setShowRejectConfirm(true)}
+                        >
+                          reject
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                          Reject and delete this draft?
+                        </span>
+                        <Button size="sm" disabled={rejectMutation.isPending} onClick={() => setShowRejectConfirm(false)}>
+                          cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={rejectMutation.isPending}
+                          onClick={() => rejectMutation.mutate()}
+                        >
+                          {rejectMutation.isPending ? 'deleting…' : 'confirm reject'}
+                        </Button>
+                      </>
+                    )}
+                    {(acceptMutation.isError || rejectMutation.isError) && (
+                      <span style={{ fontSize: 11, color: 'var(--status-error)', fontFamily: 'var(--font-mono)' }}>
+                        ✗ Action failed
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </Card>

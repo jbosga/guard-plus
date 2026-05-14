@@ -34,7 +34,7 @@ export function AddObservationModal({ sourceId, defaultSourceType = 'literature'
 
   const [content, setContent] = useState('');
   const [epistemicStatus, setEpistemicStatus] = useState<ObservationEpistemicStatus>('reported');
-  const [authoredBy, setAuthoredBy] = useState('');
+  const [authoredBy, setAuthoredBy] = useState(() => localStorage.getItem('username') ?? '');
   const [verbatim, setVerbatim] = useState(false);
   const [pageRef, setPageRef] = useState('');
 

@@ -17,6 +17,7 @@ export function Login() {
     try {
       const token = await login(username, password);
       localStorage.setItem('token', token.access_token);
+      localStorage.setItem('username', username);
       navigate('/sources');
     } catch {
       setError('Invalid username or password');
