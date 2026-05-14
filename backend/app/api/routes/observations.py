@@ -3,11 +3,12 @@ from typing import Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.corpus import Observation, Source, PhenomenonTag
-from app.models.enums import ObservationEpistemicStatus, ContentType, SourceModality, EpistemicDistance, CollectionMethod
+from app.models.corpus import Case, Observation, Source, PhenomenonTag
+from app.models.enums import ObservationEpistemicStatus, ObservationSourceType
 from app.models.user import User
 from app.models.corpus import ObservationCreate, ObservationUpdate, ObservationRead, ObservationReview
 from app.models.common import Page
@@ -16,9 +17,19 @@ from app.core.security import get_current_user
 router = APIRouter(prefix="/observations", tags=["observations"])
 
 
-def _to_observation_read(obs: Observation) -> ObservationRead:
+def _compute_staleness(obs: Observation, db: Session) -> bool:
+    if obs.observation_source_type != ObservationSourceType.CORPUS_DERIVED:
+        return False
+    if obs.case_count_at_snapshot is None:
+        return False
+    current_count = db.query(func.count(Case.id)).scalar() or 0
+    return current_count > obs.case_count_at_snapshot * 1.2
+
+
+def _to_observation_read(obs: Observation, db: Session) -> ObservationRead:
     r = ObservationRead.model_validate(obs)
     r.source_title = obs.source.title if obs.source else None
+    r.staleness_flag = _compute_staleness(obs, db)
     return r
 
 
@@ -47,9 +58,8 @@ def list_observations(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     source_id: Optional[UUID] = None,
+    observation_source_type: Optional[ObservationSourceType] = None,
     epistemic_status: Optional[List[ObservationEpistemicStatus]] = Query(None),
-    content_type: Optional[List[ContentType]] = Query(None),
-    epistemic_distance: Optional[EpistemicDistance] = None,
     tag_id: Optional[UUID] = Query(None, description="Filter to observations that carry this tag"),
     ai_extracted: Optional[bool] = None,
     unreviewed: Optional[bool] = Query(None, description="If true, return only unreviewed AI observations"),
@@ -61,12 +71,10 @@ def list_observations(
 
     if source_id is not None:
         q = q.filter(Observation.source_id == source_id)
+    if observation_source_type is not None:
+        q = q.filter(Observation.observation_source_type == observation_source_type)
     if epistemic_status:
         q = q.filter(Observation.epistemic_status.in_(epistemic_status))
-    if content_type:
-        q = q.filter(Observation.content_type.in_(content_type))
-    if epistemic_distance is not None:
-        q = q.filter(Observation.epistemic_distance == epistemic_distance)
     if tag_id is not None:
         q = q.filter(Observation.tags.any(PhenomenonTag.id == tag_id))
     if ai_extracted is not None:
@@ -85,7 +93,7 @@ def list_observations(
     )
 
     return Page.create(
-        items=[_to_observation_read(o) for o in items],
+        items=[_to_observation_read(o, db) for o in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -115,7 +123,7 @@ def review_queue(
     items = q.order_by(Observation.created_at.asc()).offset((page - 1) * page_size).limit(page_size).all()
 
     return Page.create(
-        items=[_to_observation_read(o) for o in items],
+        items=[_to_observation_read(o, db) for o in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -130,24 +138,35 @@ def create_observation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not db.query(Source).filter(Source.id == obs_in.source_id).first():
-        raise HTTPException(status_code=400, detail=f"Source {obs_in.source_id} not found")
+    # Validate corpus-derived requirements
+    if obs_in.observation_source_type == ObservationSourceType.CORPUS_DERIVED:
+        if obs_in.source_id is not None:
+            raise HTTPException(status_code=400, detail="corpus_derived observations must not have a source_id")
+        missing = [f for f in ("query_definition", "corpus_snapshot_date", "case_count_at_snapshot")
+                   if getattr(obs_in, f) is None]
+        if missing:
+            raise HTTPException(
+                status_code=422,
+                detail=f"corpus_derived observations require: {', '.join(missing)}",
+            )
+    elif obs_in.source_id is not None:
+        if not db.query(Source).filter(Source.id == obs_in.source_id).first():
+            raise HTTPException(status_code=400, detail=f"Source {obs_in.source_id} not found")
 
     tags = _resolve_tags(obs_in.tag_ids, db)
 
     obs = Observation(
         source_id=obs_in.source_id,
+        observation_source_type=obs_in.observation_source_type,
         content=obs_in.content,
-        content_type=obs_in.content_type,
-        source_modality=obs_in.source_modality,
-        epistemic_distance=obs_in.epistemic_distance,
-        collection_method=obs_in.collection_method,
         epistemic_status=obs_in.epistemic_status,
-        corroboration_level=obs_in.corroboration_level,
-        sample_n=obs_in.sample_n,
-        sample_size_tier=obs_in.sample_size_tier,
-        sampling_method=obs_in.sampling_method,
-        inclusion_criteria_documented=obs_in.inclusion_criteria_documented,
+        authored_by=obs_in.authored_by,
+        query_definition=obs_in.query_definition,
+        analysis_tool=obs_in.analysis_tool,
+        corpus_snapshot_date=obs_in.corpus_snapshot_date,
+        case_count_at_snapshot=obs_in.case_count_at_snapshot,
+        cases_included=obs_in.cases_included,
+        case_filter_description=obs_in.case_filter_description,
         verbatim=obs_in.verbatim,
         page_ref=obs_in.page_ref,
         ai_extracted=obs_in.ai_extracted,
@@ -161,7 +180,7 @@ def create_observation(
     db.add(obs)
     db.commit()
     db.refresh(obs)
-    return _to_observation_read(obs)
+    return _to_observation_read(obs, db)
 
 
 # ── Read ──────────────────────────────────────────────────────────────────────
@@ -172,7 +191,7 @@ def get_observation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return _to_observation_read(_get_or_404(observation_id, db))
+    return _to_observation_read(_get_or_404(observation_id, db), db)
 
 
 # ── Update ────────────────────────────────────────────────────────────────────
@@ -196,7 +215,7 @@ def update_observation(
 
     db.commit()
     db.refresh(obs)
-    return _to_observation_read(obs)
+    return _to_observation_read(obs, db)
 
 
 # ── Review (accept/edit/reject from queue) ────────────────────────────────────
@@ -208,10 +227,6 @@ def review_observation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Accept, edit, or reject an AI-extracted observation from the review queue.
-    Rejection deletes the observation — it never enters the corpus.
-    """
     obs = _get_or_404(observation_id, db)
 
     if not review.accepted:
@@ -226,9 +241,6 @@ def review_observation(
     if review.epistemic_status:
         obs.epistemic_status = review.epistemic_status
 
-    if review.content_type:
-        obs.content_type = review.content_type
-
     if review.tag_ids is not None:
         obs.tags = _resolve_tags(review.tag_ids, db)
 
@@ -237,7 +249,7 @@ def review_observation(
 
     db.commit()
     db.refresh(obs)
-    return _to_observation_read(obs)
+    return _to_observation_read(obs, db)
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────

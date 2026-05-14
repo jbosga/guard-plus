@@ -37,10 +37,6 @@ from app.core.config import get_settings
 from app.models.corpus import Observation, Source
 from app.models.synthesis import Hypothesis
 from app.models.enums import (
-    ContentType,
-    SourceModality,
-    EpistemicDistance,
-    CollectionMethod,
     ObservationEpistemicStatus,
     IngestionMethod,
     IngestionStatus,
@@ -78,10 +74,6 @@ class ExtractionResult:
 class ObservationDraft:
     """A single observation proposed by Claude, before DB insertion."""
     content: str
-    content_type: ContentType
-    source_modality: SourceModality
-    epistemic_distance: EpistemicDistance
-    collection_method: CollectionMethod
     epistemic_status: ObservationEpistemicStatus = ObservationEpistemicStatus.REPORTED
     page_ref: Optional[str] = None
     verbatim: bool = False
@@ -207,37 +199,6 @@ EXTRACTION RULES
 
 FIELD DEFINITIONS
 
-content_type — what kind of phenomenon the observation records:
-  experiential       — subjective experience reported by the subject
-  behavioral         — observed or reported behaviour
-  physiological      — bodily/physical measurements or symptoms
-  environmental      — physical environment conditions or traces
-  testimonial        — witness accounts or third-party reports
-  documentary_trace  — physical documents, recordings, or artefacts
-
-source_modality — how the data reached the record:
-  first_person_verbal    — direct verbal report from the experiencer
-  investigator_summary   — investigator paraphrase or summary
-  physiological          — physiological instrument reading
-  behavioral             — direct behavioural observation
-  documentary            — documentary artefact
-  aggregate_statistical  — statistical summary across multiple cases
-
-epistemic_distance — how far the record is from the original event:
-  direct       — author reporting their own data directly
-  summarized   — author summarising another's report
-  aggregated   — statistical aggregation across multiple reports
-  derived      — inferred or computed from primary data
-
-collection_method — how the data was collected:
-  spontaneous_report     — unprompted self-report
-  structured_interview   — formal interview with protocol
-  hypnotic_regression    — report obtained under hypnosis
-  questionnaire          — written survey instrument
-  clinical_assessment    — clinical/psychological evaluation
-  passive_recording      — audio/video/instrument recording
-  investigator_inference — investigator's own inference or judgement
-
 epistemic_status — confidence level of the observation:
   reported      — stated by the source without independent verification
   corroborated  — independently confirmed
@@ -295,10 +256,6 @@ markdown fences.
   "observations": [
     {
       "content": (string, required),
-      "content_type": (string, required),
-      "source_modality": (string, required),
-      "epistemic_distance": (string, required),
-      "collection_method": (string, required),
       "epistemic_status": (string, required),
       "page_ref": (string or null),
       "verbatim": (boolean)
@@ -355,10 +312,6 @@ def _call_claude(
         try:
             obs_drafts.append(ObservationDraft(
                 content=str(item["content"]).strip(),
-                content_type=ContentType(item["content_type"]),
-                source_modality=SourceModality(item["source_modality"]),
-                epistemic_distance=EpistemicDistance(item["epistemic_distance"]),
-                collection_method=CollectionMethod(item["collection_method"]),
                 epistemic_status=ObservationEpistemicStatus(
                     item.get("epistemic_status", ObservationEpistemicStatus.REPORTED)
                 ),
@@ -405,10 +358,6 @@ def _insert_observations(
             id=uuid4(),
             source_id=source.id,
             content=draft.content,
-            content_type=draft.content_type,
-            source_modality=draft.source_modality,
-            epistemic_distance=draft.epistemic_distance,
-            collection_method=draft.collection_method,
             epistemic_status=draft.epistemic_status,
             verbatim=draft.verbatim,
             page_ref=draft.page_ref,
@@ -513,10 +462,6 @@ def run_ingestion(
                 try:
                     obs_drafts.append(ObservationDraft(
                         content=str(item["content"]).strip(),
-                        content_type=ContentType(item["content_type"]),
-                        source_modality=SourceModality(item["source_modality"]),
-                        epistemic_distance=EpistemicDistance(item["epistemic_distance"]),
-                        collection_method=CollectionMethod(item["collection_method"]),
                         epistemic_status=ObservationEpistemicStatus(
                             item.get("epistemic_status", ObservationEpistemicStatus.REPORTED)
                         ),

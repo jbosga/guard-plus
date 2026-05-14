@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.db.session import get_db
-from app.models.corpus import Source, Account, Observation
+from app.models.corpus import Source, Case, Observation
 from app.models.enums import SourceType, DisciplinaryFrame, ProvenanceQuality
 from app.models.user import User
 from app.models.corpus import (
@@ -40,15 +40,25 @@ def _observation_count(source_id: uuid.UUID, db: Session) -> int:
     return db.query(func.count(Observation.id)).filter(Observation.source_id == source_id).scalar() or 0
 
 
+def _case_count(source_id: uuid.UUID, db: Session) -> int:
+    return db.query(func.count(Case.id)).filter(Case.source_id == source_id).scalar() or 0
+
+
 def _to_source_list(source: Source, db: Session) -> SourceList:
     d = SourceList.model_validate(source)
-    d.observation_count = _observation_count(source.id, db)
+    if source.source_type == SourceType.CASE_REPORT:
+        d.case_count = _case_count(source.id, db)
+    else:
+        d.observation_count = _observation_count(source.id, db)
     return d
 
 
 def _to_source_read(source: Source, db: Session) -> SourceRead:
     d = SourceRead.model_validate(source)
-    d.observation_count = _observation_count(source.id, db)
+    if source.source_type == SourceType.CASE_REPORT:
+        d.case_count = _case_count(source.id, db)
+    else:
+        d.observation_count = _observation_count(source.id, db)
     return d
 
 
@@ -115,13 +125,6 @@ def create_source(
         notes=source_in.notes,
     )
     db.add(source)
-    db.flush()
-
-    if source_in.source_type == SourceType.ACCOUNT and source_in.account_detail:
-        acct_data = source_in.account_detail.model_dump()
-        acct = Account(id=source.id, **acct_data)
-        db.add(acct)
-
     db.commit()
     db.refresh(source)
     return _to_source_read(source, db)
@@ -220,4 +223,4 @@ def get_source_observations(
         .all()
     )
     from app.api.routes.observations import _to_observation_read
-    return [_to_observation_read(o) for o in observations]
+    return [_to_observation_read(o, db) for o in observations]

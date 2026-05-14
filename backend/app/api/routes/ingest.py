@@ -24,7 +24,6 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.corpus import Observation, Source
 from app.models.enums import (
-    ContentType, SourceModality, EpistemicDistance, CollectionMethod,
     ObservationEpistemicStatus, IngestionMethod, IngestionStatus,
 )
 from app.models.user import User
@@ -38,10 +37,6 @@ router = APIRouter(prefix="/sources", tags=["ingestion"])
 class ManualObservationIn(BaseModel):
     """A single manually-entered observation submitted alongside the ingest request."""
     content: str
-    content_type: ContentType
-    source_modality: SourceModality
-    epistemic_distance: EpistemicDistance
-    collection_method: CollectionMethod
     epistemic_status: ObservationEpistemicStatus = ObservationEpistemicStatus.REPORTED
     page_ref: Optional[str] = None
     verbatim: bool = False
