@@ -41,30 +41,6 @@ export type CasesIncluded = 'all' | 'filtered_subset';
 export type CorroborationLevel =
   | 'none' | 'witness' | 'physical_trace' | 'investigator' | 'multiple';
 
-// Legacy observation typing (kept for backward compat with existing observation pages)
-export type ContentType =
-  | 'experiential' | 'behavioral' | 'physiological'
-  | 'environmental' | 'testimonial' | 'documentary_trace';
-
-export type SourceModality =
-  | 'first_person_verbal' | 'investigator_summary' | 'physiological'
-  | 'behavioral' | 'documentary' | 'aggregate_statistical';
-
-export type EpistemicDistance =
-  | 'direct' | 'summarized' | 'aggregated' | 'derived';
-
-export type CollectionMethod =
-  | 'spontaneous_report' | 'structured_interview' | 'hypnotic_regression'
-  | 'questionnaire' | 'clinical_assessment' | 'passive_recording'
-  | 'investigator_inference';
-
-export type SampleSizeTier =
-  | 'single_case' | 'small' | 'moderate' | 'large' | 'population';
-
-export type SamplingMethod =
-  | 'self_selected' | 'investigator_referred' | 'clinical'
-  | 'survey' | 'convenience' | 'unknown';
-
 // ── Case enums ────────────────────────────────────────────────────────────────
 
 export type ExtractionMethod = 'manual' | 'ai_assisted' | 'imported';

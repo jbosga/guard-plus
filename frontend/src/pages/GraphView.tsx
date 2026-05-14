@@ -5,14 +5,16 @@ import cytoscape from 'cytoscape';
 import type { Core, NodeSingular, EventObject } from 'cytoscape';
 import {
   getFrameworks,
+  getFramework,
   getHypotheses,
   getHypothesis,
 } from '../api';
 import type {
   TheoreticalFrameworkList,
+  TheoreticalFrameworkRead,
   HypothesisRead,
-  ObservationRead,
   HypothesisFramework,
+  ObservationRead,
 } from '../types';
 import { Shell } from '../components/Shell';
 import { Page } from '../components/Shell';
@@ -559,6 +561,18 @@ export function GraphView() {
     queryFn: () => getFrameworks({ page_size: 100 }),
   });
 
+  // Fetch full FrameworkRead for each framework to get core/anomalous hypothesis membership.
+  const fwIds = (frameworkData?.items ?? []).map(f => f.id);
+
+  const fwReadQueries = useQuery({
+    queryKey: ['frameworks-graph-reads', fwIds],
+    queryFn: async () => {
+      if (fwIds.length === 0) return [] as TheoreticalFrameworkRead[];
+      return Promise.all(fwIds.map(id => getFramework(id)));
+    },
+    enabled: fwIds.length > 0,
+  });
+
   const { data: hypListData } = useQuery({
     queryKey: ['hypotheses-graph-list'],
     queryFn: () => getHypotheses({ page_size: 200 }),
@@ -578,8 +592,10 @@ export function GraphView() {
     enabled: hypIds.length > 0,
   });
 
-  const isLoading = !frameworkData || !hypListData || (hypIds.length > 0 && hypReadQueries.isLoading);
-  const isError = hypReadQueries.isError;
+  const isLoading = !frameworkData || !hypListData
+    || (hypIds.length > 0 && hypReadQueries.isLoading)
+    || (fwIds.length > 0 && fwReadQueries.isLoading);
+  const isError = hypReadQueries.isError || fwReadQueries.isError;
 
   // ── Build graph data ───────────────────────────────────────────────────────
 

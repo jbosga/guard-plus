@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.corpus import Case, Observation, Source, PhenomenonTag
-from app.models.enums import ObservationEpistemicStatus, ObservationSourceType
+from app.models.enums import ObservationEpistemicStatus, ObservationSourceType, SourceType
 from app.models.user import User
 from app.models.corpus import ObservationCreate, ObservationUpdate, ObservationRead, ObservationReview
 from app.models.common import Page
@@ -107,6 +107,7 @@ def review_queue(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     source_id: Optional[UUID] = None,
+    source_type: Optional[SourceType] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -118,6 +119,8 @@ def review_queue(
     )
     if source_id:
         q = q.filter(Observation.source_id == source_id)
+    if source_type:
+        q = q.join(Source).filter(Source.source_type == source_type)
 
     total = q.count()
     items = q.order_by(Observation.created_at.asc()).offset((page - 1) * page_size).limit(page_size).all()

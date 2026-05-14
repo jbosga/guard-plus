@@ -93,7 +93,7 @@ export async function getSourceObservations(sourceId: string): Promise<Observati
   return data;
 }
 
-export async function getReviewQueue(params: { page?: number; page_size?: number; source_id?: string } = {}): Promise<Page<ObservationRead>> {
+export async function getReviewQueue(params: { page?: number; page_size?: number; source_id?: string; source_type?: string } = {}): Promise<Page<ObservationRead>> {
   const { data } = await client.get<Page<ObservationRead>>('/observations/review-queue', { params });
   return data;
 }

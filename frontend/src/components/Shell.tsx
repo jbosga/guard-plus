@@ -1,15 +1,24 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const NAV_ITEMS = [
-  { path: '/sources',      label: 'Sources',         icon: '📄' },
-  { path: '/cases',        label: 'Cases',            icon: '🗂' },
-  { path: '/cases/review', label: 'Case Review',      icon: '🔍' },
-  { path: '/observations', label: 'Observations',    icon: '🔭' },
-  { path: '/review',       label: 'Review Queue',    icon: '✅' },
-  { path: '/hypotheses',   label: 'Hypotheses',      icon: '🔬' },
-  { path: '/frameworks',   label: 'Frameworks',      icon: '🧩' },
-  { path: '/graph',        label: 'Graph',            icon: '◈'  },
+const NAV_SECTIONS = [
+  {
+    label: 'Data',
+    items: [
+      { path: '/sources',      label: 'Sources',      icon: '📄' },
+      { path: '/cases',        label: 'Cases',        icon: '📁' },
+      { path: '/observations', label: 'Observations', icon: '🔭' },
+      { path: '/review',       label: 'Review',       icon: '✅' },
+    ],
+  },
+  {
+    label: 'Synthesis',
+    items: [
+      { path: '/hypotheses',   label: 'Hypotheses',   icon: '🔬' },
+      { path: '/frameworks',   label: 'Frameworks',   icon: '🧩' },
+      { path: '/graph',        label: 'Graph',        icon: '◈'  },
+    ],
+  },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -77,41 +86,52 @@ export function Shell({ children }: { children: React.ReactNode }) {
         padding: 'var(--space-3) 0',
         overflowY: 'auto',
       }}>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 var(--space-2)' }}>
-          {NAV_ITEMS.map(item => {
-            const active = item.path === '/cases'
-            ? pathname === '/cases' || (pathname.startsWith('/cases/') && !pathname.startsWith('/cases/review'))
-            : pathname.startsWith(item.path);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 9,
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-md)',
-                  color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  textDecoration: 'none',
-                  background: active ? 'var(--bg-1)' : 'transparent',
-                  fontWeight: active ? 500 : 400,
-                  fontSize: 13,
-                  transition: 'var(--t-fast)',
-                }}
-              >
-                <span style={{ fontSize: 14, lineHeight: 1 }}>{item.icon}</span>
-                {item.label}
-                {active && (
-                  <span style={{
-                    marginLeft: 'auto',
-                    width: 4, height: 4,
-                    borderRadius: '50%',
-                    background: 'var(--accent)',
-                    flexShrink: 0,
-                  }} />
-                )}
-              </Link>
-            );
-          })}
+        <nav style={{ display: 'flex', flexDirection: 'column', padding: '0 var(--space-2)' }}>
+          {NAV_SECTIONS.map((section, si) => (
+            <div key={section.label} style={{ marginTop: si > 0 ? 'var(--space-3)' : 0 }}>
+              <div style={{
+                fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                letterSpacing: '0.08em', color: 'var(--text-dim)',
+                padding: '8px 10px 4px',
+              }}>
+                {section.label}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {section.items.map(item => {
+                  const active = pathname.startsWith(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 9,
+                        padding: '6px 10px',
+                        borderRadius: 'var(--radius-md)',
+                        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        textDecoration: 'none',
+                        background: active ? 'var(--bg-1)' : 'transparent',
+                        fontWeight: active ? 500 : 400,
+                        fontSize: 13,
+                        transition: 'var(--t-fast)',
+                      }}
+                    >
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>{item.icon}</span>
+                      {item.label}
+                      {active && (
+                        <span style={{
+                          marginLeft: 'auto',
+                          width: 4, height: 4,
+                          borderRadius: '50%',
+                          background: 'var(--accent)',
+                          flexShrink: 0,
+                        }} />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Bottom note */}

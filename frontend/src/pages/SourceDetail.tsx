@@ -8,7 +8,7 @@ import { AddCaseModal } from '../components/AddCaseModal';
 import {
   Page, Spinner, ErrorState, EmptyState,
   SourceTypeBadge, ProvenanceBadge, IngestionDot,
-  ObservationEpistemicBadge, ContentTypeBadge, CollectionMethodBadge,
+  ObservationEpistemicBadge,
   CorroborationBadge, Badge,
   Button, Card, Stat, SectionHeader, Select,
 } from '../components/ui';

@@ -1,7 +1,7 @@
 import React from 'react';
 import type {
   SourceType, ProvenanceQuality, IngestionStatus,
-  ObservationEpistemicStatus, ContentType, CollectionMethod,
+  ObservationEpistemicStatus,
   HypothesisType, HypothesisStatus, ConfidenceLevel, FrameworkStatus,
   ExtractionMethod, CorroborationLevelV2, PresenceAbsenceUnknown,
 } from '../types';
@@ -58,39 +58,6 @@ export function ObservationEpistemicBadge({ status }: { status: ObservationEpist
       style={status === 'retracted' ? { textDecoration: 'line-through', opacity: 0.7 } : undefined}
     />
   );
-}
-
-// ── Content type ──────────────────────────────────────────────────────────────
-
-const CT_COLORS: Record<ContentType, { color: string; bg: string }> = {
-  experiential:       { color: 'var(--status-info)',  bg: 'var(--status-info-bg)' },
-  behavioral:         { color: 'var(--ep-inferred)',  bg: 'var(--status-ok-bg)' },
-  physiological:      { color: '#a78bfa',             bg: 'rgba(167,139,250,0.08)' },
-  environmental:      { color: '#fbbf24',             bg: 'rgba(251,191,36,0.08)' },
-  testimonial:        { color: 'var(--text-secondary)', bg: 'var(--bg-2)' },
-  documentary_trace:  { color: '#60a5fa',             bg: 'rgba(96,165,250,0.08)' },
-};
-
-export function ContentTypeBadge({ type }: { type: ContentType }) {
-  const { color, bg } = CT_COLORS[type];
-  return <Badge label={type.replace(/_/g, ' ')} color={color} bg={bg} />;
-}
-
-// ── Collection method ─────────────────────────────────────────────────────────
-
-const CM_COLORS: Record<CollectionMethod, { color: string; bg: string }> = {
-  spontaneous_report:   { color: 'var(--text-secondary)', bg: 'var(--bg-2)' },
-  structured_interview: { color: 'var(--status-info)',    bg: 'var(--status-info-bg)' },
-  hypnotic_regression:  { color: '#d97706',               bg: 'rgba(217,119,6,0.12)' }, // amber — reliability concern
-  questionnaire:        { color: 'var(--status-ok)',      bg: 'var(--status-ok-bg)' },
-  clinical_assessment:  { color: '#a78bfa',               bg: 'rgba(167,139,250,0.08)' },
-  passive_recording:    { color: '#60a5fa',               bg: 'rgba(96,165,250,0.08)' },
-  investigator_inference:{ color: 'var(--status-warn)',   bg: 'var(--status-warn-bg)' },
-};
-
-export function CollectionMethodBadge({ method }: { method: CollectionMethod }) {
-  const { color, bg } = CM_COLORS[method];
-  return <Badge label={method.replace(/_/g, ' ')} color={color} bg={bg} />;
 }
 
 // ── Hypothesis type ───────────────────────────────────────────────────────────
