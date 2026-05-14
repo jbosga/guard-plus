@@ -12,7 +12,7 @@ from app.models.corpus import Source, Case, Observation
 from app.models.enums import SourceType, DisciplinaryFrame, ProvenanceQuality
 from app.models.user import User
 from app.models.corpus import (
-    SourceCreate, SourceUpdate, SourceList, SourceRead, ObservationRead,
+    SourceCreate, SourceUpdate, SourceList, SourceRead, ObservationRead, CaseList,
 )
 from app.models.common import Page
 from app.core.security import get_current_user
@@ -204,6 +204,30 @@ def upload_file(
     db.commit()
 
     return {"file_ref": filename}
+
+
+# ── Cases sub-resource ───────────────────────────────────────────────────────
+
+@router.get("/{source_id}/cases", response_model=Page[CaseList])
+def get_source_cases(
+    source_id: uuid.UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Paginated cases for a given source (must be source_type == case_report)."""
+    _get_or_404(source_id, db)
+    q = db.query(Case).filter(Case.source_id == source_id)
+    total = q.count()
+    items = q.order_by(Case.created_at.asc()).offset((page - 1) * page_size).limit(page_size).all()
+    from app.api.routes.cases import _to_case_list
+    return Page.create(
+        items=[_to_case_list(c) for c in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 # ── Observations sub-resource ─────────────────────────────────────────────────

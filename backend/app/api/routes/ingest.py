@@ -141,14 +141,20 @@ def ingest_source(
 
         background_tasks.add_task(_run_ai_ingestion_background, source_id, db_url)
 
+        from app.models.enums import SourceType
+        review_queue = (
+            "GET /cases/review-queue"
+            if source.source_type == SourceType.CASE_REPORT
+            else "GET /observations/review-queue"
+        )
         return IngestResponse(
             source_id=source_id,
             method=IngestionMethod.AI,
             status=IngestionStatus.PENDING,
             message=(
                 "Ingestion queued. Pipeline is running in the background. "
-                "Poll GET /sources/{source_id} for status updates. "
-                "Extracted observations will appear in GET /observations/review-queue."
+                f"Poll GET /sources/{source_id} for status updates. "
+                f"Extracted records will appear in {review_queue}."
             ),
             source_title=source.title,
             has_raw_text=bool(source.raw_text),

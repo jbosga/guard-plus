@@ -454,6 +454,11 @@ class Case(Base, TimestampMixin):
     )
     case_quality_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Review fields
+    reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     source: Mapped["Source"] = relationship("Source", back_populates="cases")
 
 
@@ -661,3 +666,442 @@ class ObservationReview(BaseModel):
     edited_content: Optional[str] = None
     epistemic_status: Optional[ObservationEpistemicStatus] = None
     tag_ids: Optional[List[uuid.UUID]] = None
+
+
+# ── Case Pydantic schemas ─────────────────────────────────────────────────────
+
+class CaseCreate(BaseModel):
+    source_id: uuid.UUID
+    case_label: str
+    extraction_method: Optional[ExtractionMethod] = None
+    extraction_date: Optional[date] = None
+    extracted_by: Optional[str] = None
+    notes: Optional[str] = None
+    # Section 2
+    experiencer_nationality: Optional[str] = None
+    experiencer_ethnicity: Optional[str] = None
+    experiencer_age_at_event: Optional[int] = None
+    experiencer_sex: Optional[ExperiencerSex] = None
+    experiencer_gender: Optional[str] = None
+    experiencer_occupation: Optional[str] = None
+    education_level: Optional[EducationLevel] = None
+    marital_status: Optional[MaritalStatus] = None
+    religiosity: Optional[Religiosity] = None
+    # Section 3
+    prior_ufo_interest: Optional[PriorInterestLevel] = None
+    prior_paranormal_belief: Optional[PriorInterestLevel] = None
+    cultural_media_exposure_to_aae: Optional[PriorInterestLevel] = None
+    childhood_trauma_history: Optional[HistoryPresence] = None
+    childhood_abuse_history: Optional[HistoryPresence] = None
+    surgical_history_present: Optional[HistoryPresence] = None
+    surgical_history_detail: Optional[str] = None
+    neuropsychiatric_history_present: Optional[HistoryPresence] = None
+    neuropsychiatric_history_detail: Optional[str] = None
+    substance_use_present: Optional[HistoryPresence] = None
+    substance_use_detail: Optional[str] = None
+    motivational_factors_present: Optional[MotivationalFactors] = None
+    motivational_factors_detail: Optional[str] = None
+    repeat_experiencer: Optional[RepeatExperiencer] = None
+    # Section 4
+    event_date: Optional[date] = None
+    event_date_precision: Optional[EventDatePrecision] = None
+    event_time_of_day: Optional[str] = None
+    sleep_wake_state_at_onset: Optional[SleepWakeState] = None
+    physical_location_type: Optional[PhysicalLocationType] = None
+    physical_location_detail: Optional[str] = None
+    alone_at_onset: Optional[AloneatOnset] = None
+    witness_count: Optional[int] = None
+    environmental_stimuli_present: Optional[PresenceAbsenceUnknown] = None
+    environmental_stimuli_detail: Optional[str] = None
+    psychological_state_preceding: Optional[PsychologicalStateType] = None
+    psychological_state_detail: Optional[str] = None
+    altered_state_at_onset: Optional[AlteredStateDepth] = None
+    altered_state_types: Optional[List[str]] = None
+    # Section 5
+    duration_of_experience: Optional[EventDuration] = None
+    missing_time_reported: Optional[PresenceAbsenceUnknown] = None
+    missing_time_duration: Optional[str] = None
+    paralysis_reported: Optional[ParalysisExtent] = None
+    perceived_physical_transport: Optional[PresenceAbsenceUnknown] = None
+    out_of_body_sensation: Optional[PresenceAbsenceUnknown] = None
+    floating_sensation: Optional[PresenceAbsenceUnknown] = None
+    tunnel_or_passage_sensation: Optional[PresenceAbsenceUnknown] = None
+    entity_presence: Optional[PresenceAbsenceUnknown] = None
+    entity_count: Optional[EntityCount] = None
+    entity_types: Optional[List[str]] = None
+    entity_types_detail: Optional[str] = None
+    entity_communication_present: Optional[PresenceAbsenceUnknown] = None
+    entity_communication_modality: Optional[List[str]] = None
+    entity_communication_content_type: Optional[List[str]] = None
+    educational_or_mission_messaging: Optional[PresenceAbsenceUnknown] = None
+    medical_procedure_motif: Optional[PresenceAbsenceUnknown] = None
+    medical_procedure_detail: Optional[str] = None
+    reproductive_or_sexual_motif: Optional[PresenceAbsenceUnknown] = None
+    reproductive_motif_detail: Optional[str] = None
+    craft_or_vehicle_reported: Optional[PresenceAbsenceUnknown] = None
+    craft_description: Optional[str] = None
+    physical_environment_changes: Optional[PresenceAbsenceUnknown] = None
+    physical_environment_changes_detail: Optional[str] = None
+    event_sequence_described: Optional[PresenceAbsenceUnknown] = None
+    event_sequence_detail: Optional[str] = None
+    physiological_symptoms: Optional[List[str]] = None
+    physiological_symptoms_detail: Optional[str] = None
+    emotional_valence_during_event: Optional[List[str]] = None
+    emotional_valence_detail: Optional[str] = None
+    # Section 6
+    physical_marks_present: Optional[PresenceAbsenceUnknown] = None
+    physical_marks_detail: Optional[str] = None
+    physical_marks_medically_examined: Optional[PsychometricPresence] = None
+    environmental_physical_evidence: Optional[PresenceAbsenceUnknown] = None
+    environmental_physical_evidence_detail: Optional[str] = None
+    independent_corroboration_present: Optional[PresenceAbsenceUnknown] = None
+    independent_corroboration_detail: Optional[str] = None
+    eeg_or_neurological_data_available: Optional[PsychometricPresence] = None
+    eeg_data_detail: Optional[str] = None
+    blood_or_toxicology_data_available: Optional[PsychometricPresence] = None
+    blood_data_detail: Optional[str] = None
+    # Section 7
+    fantasy_proneness_assessed: Optional[PsychometricPresence] = None
+    fantasy_proneness_score: Optional[float] = None
+    fantasy_proneness_instrument: Optional[str] = None
+    hypnotic_suggestibility_assessed: Optional[PsychometricPresence] = None
+    hypnotic_suggestibility_score: Optional[float] = None
+    hypnotic_suggestibility_instrument: Optional[str] = None
+    boundary_thinness_assessed: Optional[PsychometricPresence] = None
+    boundary_thinness_score: Optional[float] = None
+    boundary_thinness_instrument: Optional[str] = None
+    dissociation_assessed: Optional[PsychometricPresence] = None
+    dissociation_score: Optional[float] = None
+    dissociation_instrument: Optional[str] = None
+    ptsd_symptoms_assessed: Optional[PsychometricPresence] = None
+    ptsd_symptoms_present: Optional[ClinicalLevel] = None
+    ptsd_instrument: Optional[str] = None
+    psychopathology_screened: Optional[PsychometricPresence] = None
+    psychopathology_findings: Optional[ClinicalPresence] = None
+    psychopathology_detail: Optional[str] = None
+    need_for_meaning_assessed: Optional[PsychometricPresence] = None
+    need_for_meaning_level: Optional[PsychometricLevel] = None
+    self_escape_motivation_assessed: Optional[PsychometricPresence] = None
+    self_escape_motivation_level: Optional[PsychometricLevel] = None
+    # Section 8
+    memory_retrieval_method: Optional[List[str]] = None
+    hypnosis_used: Optional[PsychometricPresence] = None
+    hypnotist_identity: Optional[str] = None
+    investigator_or_therapist_involved: Optional[PsychometricPresence] = None
+    investigator_detail: Optional[str] = None
+    account_consistency_over_time: Optional[AccountConsistency] = None
+    number_of_accounts_on_record: Optional[int] = None
+    # Section 9
+    positive_transformation_reported: Optional[PresenceAbsenceUnknown] = None
+    positive_transformation_detail: Optional[str] = None
+    negative_psychological_aftermath: Optional[PresenceAbsenceUnknown] = None
+    negative_aftermath_detail: Optional[str] = None
+    ongoing_contact_reported: Optional[PresenceAbsenceUnknown] = None
+    ongoing_contact_detail: Optional[str] = None
+    changed_worldview_reported: Optional[PresenceAbsenceUnknown] = None
+    worldview_change_detail: Optional[str] = None
+    sought_community_or_support: Optional[PresenceAbsenceUnknown] = None
+    community_type: Optional[List[str]] = None
+    # Section 10
+    corroboration_level: Optional[CorroborationLevelV2] = None
+    case_quality_notes: Optional[str] = None
+
+
+class CaseUpdate(BaseModel):
+    case_label: Optional[str] = None
+    extraction_method: Optional[ExtractionMethod] = None
+    extraction_date: Optional[date] = None
+    extracted_by: Optional[str] = None
+    notes: Optional[str] = None
+    experiencer_nationality: Optional[str] = None
+    experiencer_ethnicity: Optional[str] = None
+    experiencer_age_at_event: Optional[int] = None
+    experiencer_sex: Optional[ExperiencerSex] = None
+    experiencer_gender: Optional[str] = None
+    experiencer_occupation: Optional[str] = None
+    education_level: Optional[EducationLevel] = None
+    marital_status: Optional[MaritalStatus] = None
+    religiosity: Optional[Religiosity] = None
+    prior_ufo_interest: Optional[PriorInterestLevel] = None
+    prior_paranormal_belief: Optional[PriorInterestLevel] = None
+    cultural_media_exposure_to_aae: Optional[PriorInterestLevel] = None
+    childhood_trauma_history: Optional[HistoryPresence] = None
+    childhood_abuse_history: Optional[HistoryPresence] = None
+    surgical_history_present: Optional[HistoryPresence] = None
+    surgical_history_detail: Optional[str] = None
+    neuropsychiatric_history_present: Optional[HistoryPresence] = None
+    neuropsychiatric_history_detail: Optional[str] = None
+    substance_use_present: Optional[HistoryPresence] = None
+    substance_use_detail: Optional[str] = None
+    motivational_factors_present: Optional[MotivationalFactors] = None
+    motivational_factors_detail: Optional[str] = None
+    repeat_experiencer: Optional[RepeatExperiencer] = None
+    event_date: Optional[date] = None
+    event_date_precision: Optional[EventDatePrecision] = None
+    event_time_of_day: Optional[str] = None
+    sleep_wake_state_at_onset: Optional[SleepWakeState] = None
+    physical_location_type: Optional[PhysicalLocationType] = None
+    physical_location_detail: Optional[str] = None
+    alone_at_onset: Optional[AloneatOnset] = None
+    witness_count: Optional[int] = None
+    environmental_stimuli_present: Optional[PresenceAbsenceUnknown] = None
+    environmental_stimuli_detail: Optional[str] = None
+    psychological_state_preceding: Optional[PsychologicalStateType] = None
+    psychological_state_detail: Optional[str] = None
+    altered_state_at_onset: Optional[AlteredStateDepth] = None
+    altered_state_types: Optional[List[str]] = None
+    duration_of_experience: Optional[EventDuration] = None
+    missing_time_reported: Optional[PresenceAbsenceUnknown] = None
+    missing_time_duration: Optional[str] = None
+    paralysis_reported: Optional[ParalysisExtent] = None
+    perceived_physical_transport: Optional[PresenceAbsenceUnknown] = None
+    out_of_body_sensation: Optional[PresenceAbsenceUnknown] = None
+    floating_sensation: Optional[PresenceAbsenceUnknown] = None
+    tunnel_or_passage_sensation: Optional[PresenceAbsenceUnknown] = None
+    entity_presence: Optional[PresenceAbsenceUnknown] = None
+    entity_count: Optional[EntityCount] = None
+    entity_types: Optional[List[str]] = None
+    entity_types_detail: Optional[str] = None
+    entity_communication_present: Optional[PresenceAbsenceUnknown] = None
+    entity_communication_modality: Optional[List[str]] = None
+    entity_communication_content_type: Optional[List[str]] = None
+    educational_or_mission_messaging: Optional[PresenceAbsenceUnknown] = None
+    medical_procedure_motif: Optional[PresenceAbsenceUnknown] = None
+    medical_procedure_detail: Optional[str] = None
+    reproductive_or_sexual_motif: Optional[PresenceAbsenceUnknown] = None
+    reproductive_motif_detail: Optional[str] = None
+    craft_or_vehicle_reported: Optional[PresenceAbsenceUnknown] = None
+    craft_description: Optional[str] = None
+    physical_environment_changes: Optional[PresenceAbsenceUnknown] = None
+    physical_environment_changes_detail: Optional[str] = None
+    event_sequence_described: Optional[PresenceAbsenceUnknown] = None
+    event_sequence_detail: Optional[str] = None
+    physiological_symptoms: Optional[List[str]] = None
+    physiological_symptoms_detail: Optional[str] = None
+    emotional_valence_during_event: Optional[List[str]] = None
+    emotional_valence_detail: Optional[str] = None
+    physical_marks_present: Optional[PresenceAbsenceUnknown] = None
+    physical_marks_detail: Optional[str] = None
+    physical_marks_medically_examined: Optional[PsychometricPresence] = None
+    environmental_physical_evidence: Optional[PresenceAbsenceUnknown] = None
+    environmental_physical_evidence_detail: Optional[str] = None
+    independent_corroboration_present: Optional[PresenceAbsenceUnknown] = None
+    independent_corroboration_detail: Optional[str] = None
+    eeg_or_neurological_data_available: Optional[PsychometricPresence] = None
+    eeg_data_detail: Optional[str] = None
+    blood_or_toxicology_data_available: Optional[PsychometricPresence] = None
+    blood_data_detail: Optional[str] = None
+    fantasy_proneness_assessed: Optional[PsychometricPresence] = None
+    fantasy_proneness_score: Optional[float] = None
+    fantasy_proneness_instrument: Optional[str] = None
+    hypnotic_suggestibility_assessed: Optional[PsychometricPresence] = None
+    hypnotic_suggestibility_score: Optional[float] = None
+    hypnotic_suggestibility_instrument: Optional[str] = None
+    boundary_thinness_assessed: Optional[PsychometricPresence] = None
+    boundary_thinness_score: Optional[float] = None
+    boundary_thinness_instrument: Optional[str] = None
+    dissociation_assessed: Optional[PsychometricPresence] = None
+    dissociation_score: Optional[float] = None
+    dissociation_instrument: Optional[str] = None
+    ptsd_symptoms_assessed: Optional[PsychometricPresence] = None
+    ptsd_symptoms_present: Optional[ClinicalLevel] = None
+    ptsd_instrument: Optional[str] = None
+    psychopathology_screened: Optional[PsychometricPresence] = None
+    psychopathology_findings: Optional[ClinicalPresence] = None
+    psychopathology_detail: Optional[str] = None
+    need_for_meaning_assessed: Optional[PsychometricPresence] = None
+    need_for_meaning_level: Optional[PsychometricLevel] = None
+    self_escape_motivation_assessed: Optional[PsychometricPresence] = None
+    self_escape_motivation_level: Optional[PsychometricLevel] = None
+    memory_retrieval_method: Optional[List[str]] = None
+    hypnosis_used: Optional[PsychometricPresence] = None
+    hypnotist_identity: Optional[str] = None
+    investigator_or_therapist_involved: Optional[PsychometricPresence] = None
+    investigator_detail: Optional[str] = None
+    account_consistency_over_time: Optional[AccountConsistency] = None
+    number_of_accounts_on_record: Optional[int] = None
+    positive_transformation_reported: Optional[PresenceAbsenceUnknown] = None
+    positive_transformation_detail: Optional[str] = None
+    negative_psychological_aftermath: Optional[PresenceAbsenceUnknown] = None
+    negative_aftermath_detail: Optional[str] = None
+    ongoing_contact_reported: Optional[PresenceAbsenceUnknown] = None
+    ongoing_contact_detail: Optional[str] = None
+    changed_worldview_reported: Optional[PresenceAbsenceUnknown] = None
+    worldview_change_detail: Optional[str] = None
+    sought_community_or_support: Optional[PresenceAbsenceUnknown] = None
+    community_type: Optional[List[str]] = None
+    corroboration_level: Optional[CorroborationLevelV2] = None
+    case_quality_notes: Optional[str] = None
+
+
+class CaseReview(BaseModel):
+    accepted: bool
+    edits: Optional[CaseUpdate] = None
+
+
+class CaseList(BaseModel):
+    id: uuid.UUID
+    source_id: uuid.UUID
+    source_title: Optional[str] = None
+    case_label: str
+    extraction_method: Optional[ExtractionMethod] = None
+    entity_presence: Optional[PresenceAbsenceUnknown] = None
+    sleep_wake_state_at_onset: Optional[SleepWakeState] = None
+    paralysis_reported: Optional[ParalysisExtent] = None
+    hypnosis_used: Optional[PsychometricPresence] = None
+    corroboration_level: Optional[CorroborationLevelV2] = None
+    repeat_experiencer: Optional[RepeatExperiencer] = None
+    reviewed: bool = False
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CaseRead(BaseModel):
+    id: uuid.UUID
+    source_id: uuid.UUID
+    source_title: Optional[str] = None
+    case_label: str
+    extraction_method: Optional[ExtractionMethod] = None
+    extraction_date: Optional[date] = None
+    extracted_by: Optional[str] = None
+    notes: Optional[str] = None
+    # Section 2
+    experiencer_nationality: Optional[str] = None
+    experiencer_ethnicity: Optional[str] = None
+    experiencer_age_at_event: Optional[int] = None
+    experiencer_sex: Optional[ExperiencerSex] = None
+    experiencer_gender: Optional[str] = None
+    experiencer_occupation: Optional[str] = None
+    education_level: Optional[EducationLevel] = None
+    marital_status: Optional[MaritalStatus] = None
+    religiosity: Optional[Religiosity] = None
+    # Section 3
+    prior_ufo_interest: Optional[PriorInterestLevel] = None
+    prior_paranormal_belief: Optional[PriorInterestLevel] = None
+    cultural_media_exposure_to_aae: Optional[PriorInterestLevel] = None
+    childhood_trauma_history: Optional[HistoryPresence] = None
+    childhood_abuse_history: Optional[HistoryPresence] = None
+    surgical_history_present: Optional[HistoryPresence] = None
+    surgical_history_detail: Optional[str] = None
+    neuropsychiatric_history_present: Optional[HistoryPresence] = None
+    neuropsychiatric_history_detail: Optional[str] = None
+    substance_use_present: Optional[HistoryPresence] = None
+    substance_use_detail: Optional[str] = None
+    motivational_factors_present: Optional[MotivationalFactors] = None
+    motivational_factors_detail: Optional[str] = None
+    repeat_experiencer: Optional[RepeatExperiencer] = None
+    # Section 4
+    event_date: Optional[date] = None
+    event_date_precision: Optional[EventDatePrecision] = None
+    event_time_of_day: Optional[str] = None
+    sleep_wake_state_at_onset: Optional[SleepWakeState] = None
+    physical_location_type: Optional[PhysicalLocationType] = None
+    physical_location_detail: Optional[str] = None
+    alone_at_onset: Optional[AloneatOnset] = None
+    witness_count: Optional[int] = None
+    environmental_stimuli_present: Optional[PresenceAbsenceUnknown] = None
+    environmental_stimuli_detail: Optional[str] = None
+    psychological_state_preceding: Optional[PsychologicalStateType] = None
+    psychological_state_detail: Optional[str] = None
+    altered_state_at_onset: Optional[AlteredStateDepth] = None
+    altered_state_types: Optional[List[str]] = None
+    # Section 5
+    duration_of_experience: Optional[EventDuration] = None
+    missing_time_reported: Optional[PresenceAbsenceUnknown] = None
+    missing_time_duration: Optional[str] = None
+    paralysis_reported: Optional[ParalysisExtent] = None
+    perceived_physical_transport: Optional[PresenceAbsenceUnknown] = None
+    out_of_body_sensation: Optional[PresenceAbsenceUnknown] = None
+    floating_sensation: Optional[PresenceAbsenceUnknown] = None
+    tunnel_or_passage_sensation: Optional[PresenceAbsenceUnknown] = None
+    entity_presence: Optional[PresenceAbsenceUnknown] = None
+    entity_count: Optional[EntityCount] = None
+    entity_types: Optional[List[str]] = None
+    entity_types_detail: Optional[str] = None
+    entity_communication_present: Optional[PresenceAbsenceUnknown] = None
+    entity_communication_modality: Optional[List[str]] = None
+    entity_communication_content_type: Optional[List[str]] = None
+    educational_or_mission_messaging: Optional[PresenceAbsenceUnknown] = None
+    medical_procedure_motif: Optional[PresenceAbsenceUnknown] = None
+    medical_procedure_detail: Optional[str] = None
+    reproductive_or_sexual_motif: Optional[PresenceAbsenceUnknown] = None
+    reproductive_motif_detail: Optional[str] = None
+    craft_or_vehicle_reported: Optional[PresenceAbsenceUnknown] = None
+    craft_description: Optional[str] = None
+    physical_environment_changes: Optional[PresenceAbsenceUnknown] = None
+    physical_environment_changes_detail: Optional[str] = None
+    event_sequence_described: Optional[PresenceAbsenceUnknown] = None
+    event_sequence_detail: Optional[str] = None
+    physiological_symptoms: Optional[List[str]] = None
+    physiological_symptoms_detail: Optional[str] = None
+    emotional_valence_during_event: Optional[List[str]] = None
+    emotional_valence_detail: Optional[str] = None
+    # Section 6
+    physical_marks_present: Optional[PresenceAbsenceUnknown] = None
+    physical_marks_detail: Optional[str] = None
+    physical_marks_medically_examined: Optional[PsychometricPresence] = None
+    environmental_physical_evidence: Optional[PresenceAbsenceUnknown] = None
+    environmental_physical_evidence_detail: Optional[str] = None
+    independent_corroboration_present: Optional[PresenceAbsenceUnknown] = None
+    independent_corroboration_detail: Optional[str] = None
+    eeg_or_neurological_data_available: Optional[PsychometricPresence] = None
+    eeg_data_detail: Optional[str] = None
+    blood_or_toxicology_data_available: Optional[PsychometricPresence] = None
+    blood_data_detail: Optional[str] = None
+    # Section 7
+    fantasy_proneness_assessed: Optional[PsychometricPresence] = None
+    fantasy_proneness_score: Optional[float] = None
+    fantasy_proneness_instrument: Optional[str] = None
+    hypnotic_suggestibility_assessed: Optional[PsychometricPresence] = None
+    hypnotic_suggestibility_score: Optional[float] = None
+    hypnotic_suggestibility_instrument: Optional[str] = None
+    boundary_thinness_assessed: Optional[PsychometricPresence] = None
+    boundary_thinness_score: Optional[float] = None
+    boundary_thinness_instrument: Optional[str] = None
+    dissociation_assessed: Optional[PsychometricPresence] = None
+    dissociation_score: Optional[float] = None
+    dissociation_instrument: Optional[str] = None
+    ptsd_symptoms_assessed: Optional[PsychometricPresence] = None
+    ptsd_symptoms_present: Optional[ClinicalLevel] = None
+    ptsd_instrument: Optional[str] = None
+    psychopathology_screened: Optional[PsychometricPresence] = None
+    psychopathology_findings: Optional[ClinicalPresence] = None
+    psychopathology_detail: Optional[str] = None
+    need_for_meaning_assessed: Optional[PsychometricPresence] = None
+    need_for_meaning_level: Optional[PsychometricLevel] = None
+    self_escape_motivation_assessed: Optional[PsychometricPresence] = None
+    self_escape_motivation_level: Optional[PsychometricLevel] = None
+    # Section 8
+    memory_retrieval_method: Optional[List[str]] = None
+    hypnosis_used: Optional[PsychometricPresence] = None
+    hypnotist_identity: Optional[str] = None
+    investigator_or_therapist_involved: Optional[PsychometricPresence] = None
+    investigator_detail: Optional[str] = None
+    account_consistency_over_time: Optional[AccountConsistency] = None
+    number_of_accounts_on_record: Optional[int] = None
+    # Section 9
+    positive_transformation_reported: Optional[PresenceAbsenceUnknown] = None
+    positive_transformation_detail: Optional[str] = None
+    negative_psychological_aftermath: Optional[PresenceAbsenceUnknown] = None
+    negative_aftermath_detail: Optional[str] = None
+    ongoing_contact_reported: Optional[PresenceAbsenceUnknown] = None
+    ongoing_contact_detail: Optional[str] = None
+    changed_worldview_reported: Optional[PresenceAbsenceUnknown] = None
+    worldview_change_detail: Optional[str] = None
+    sought_community_or_support: Optional[PresenceAbsenceUnknown] = None
+    community_type: Optional[List[str]] = None
+    # Section 10
+    corroboration_level: Optional[CorroborationLevelV2] = None
+    case_quality_notes: Optional[str] = None
+
+    reviewed: bool = False
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

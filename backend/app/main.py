@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.api.routes import auth, sources, observations, tags, concepts, hypotheses, epistemic_notes, frameworks
-from app.api.routes import ingest
+from app.api.routes import ingest, cases, export
 
 settings = get_settings()
 
@@ -34,7 +34,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Warning", "X-Warning-Anomalous", "X-Warning-Falsification"],
+    expose_headers=["X-Warning", "X-Warning-Anomalous", "X-Warning-Falsification", "X-Corpus-Snapshot-Date", "X-Case-Count"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
@@ -49,6 +49,8 @@ app.include_router(hypotheses.router, prefix=PREFIX)
 app.include_router(frameworks.router, prefix=PREFIX)
 app.include_router(epistemic_notes.router, prefix=PREFIX)
 app.include_router(ingest.router, prefix=PREFIX)
+app.include_router(export.router, prefix=PREFIX)  # must be before cases to avoid /{id} shadowing /export
+app.include_router(cases.router, prefix=PREFIX)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

@@ -34,7 +34,7 @@ import anthropic
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.corpus import Observation, Source
+from app.models.corpus import Case, Observation, Source
 from app.models.synthesis import Hypothesis
 from app.models.enums import (
     ObservationEpistemicStatus,
@@ -44,6 +44,8 @@ from app.models.enums import (
     HypothesisFramework,
     HypothesisStatus,
     ConfidenceLevel,
+    SourceType,
+    ExtractionMethod,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,6 +70,13 @@ class ExtractionResult:
     page_count: int
     ocr_pages: int = 0
     extraction_notes: str = ""
+
+
+@dataclass
+class CaseDraft:
+    """A case record proposed by Claude, before review. All fields except case_label are optional."""
+    case_label: str
+    fields: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -100,6 +109,7 @@ class IngestionResult:
     raw_text: Optional[str] = None
     observations_inserted: int = 0
     hypotheses_inserted: int = 0
+    cases_inserted: int = 0
     ocr_pages: int = 0
     error: Optional[str] = None
 
@@ -341,7 +351,241 @@ def _call_claude(
     return obs_drafts, hyp_drafts
 
 
+# ── Case extraction prompt ────────────────────────────────────────────────────
+
+_CASE_SYSTEM_PROMPT = """\
+You are a rigorous research assistant supporting a scientific study of the \
+anomalous abduction experience (AAE). Your task is to extract structured data \
+from a case report of a single AAE account.
+
+EPISTEMOLOGICAL STANCE
+The research program is neither credulous nor dismissive. First-person accounts \
+are treated as empirical data. Your job is to extract what the source actually \
+says — not to validate or debunk it.
+
+EXTRACTION RULES
+1. Populate ONLY fields that are explicitly stated in the source text.
+2. Leave all other fields as null — do not infer, interpolate, or assume.
+3. For multi-select fields, return a JSON array of valid enum value strings.
+4. For single-select enum fields, return the exact enum value string or null.
+5. If a value is ambiguous, set the field to null and record the ambiguity in \
+the `notes` field.
+6. Do not add any information not present in the source text.
+7. Numeric scores (e.g. dissociation_score) must be the actual numeric value \
+reported, not an interpretation.
+
+FIELD REFERENCE
+
+case_label (string, required): a short identifying label for this case \
+(e.g. "Walton 1975" or "Case 14 — anonymous female, 1987")
+
+Section 2 — Context & Demographics:
+  experiencer_nationality (string), experiencer_ethnicity (string),
+  experiencer_age_at_event (integer), experiencer_occupation (string),
+  experiencer_gender (string),
+  experiencer_sex: male | female | intersex | not_reported,
+  education_level: primary | secondary | tertiary | postgraduate | not_reported,
+  marital_status: single | married | partnered | divorced | widowed | not_reported,
+  religiosity: none | low | moderate | high | not_reported
+
+Section 3 — Background History:
+  prior_ufo_interest: none | low | moderate | high | not_reported,
+  prior_paranormal_belief: none | low | moderate | high | not_reported,
+  cultural_media_exposure_to_aae: none | low | moderate | high | not_reported,
+  childhood_trauma_history: none | suspected | confirmed | not_reported,
+  childhood_abuse_history: none | suspected | confirmed | not_reported,
+  surgical_history_present: none | suspected | confirmed | not_reported,
+  surgical_history_detail (string),
+  neuropsychiatric_history_present: none | suspected | confirmed | not_reported,
+  neuropsychiatric_history_detail (string),
+  substance_use_present: none | suspected | confirmed | not_reported,
+  substance_use_detail (string),
+  motivational_factors_present: none_apparent | suspected | confirmed | not_assessed,
+  motivational_factors_detail (string),
+  repeat_experiencer: first_experience | repeat_experiencer | not_reported
+
+Section 4 — Onset Conditions:
+  event_date (YYYY-MM-DD string or null),
+  event_date_precision: exact | month_and_year | year_only | decade | unknown,
+  event_time_of_day: early_morning | morning | afternoon | evening | night | unknown,
+  sleep_wake_state_at_onset: fully_awake | drowsy | hypnagogic | hypnopompic | asleep | unknown,
+  physical_location_type: bedroom | other_indoor | vehicle | outdoor_rural | outdoor_urban | unknown,
+  physical_location_detail (string),
+  alone_at_onset: alone | others_present | unknown,
+  witness_count (integer),
+  environmental_stimuli_present: none | yes | unknown,
+  environmental_stimuli_detail (string),
+  psychological_state_preceding: normal | stressed | anxious | depressed | elated | dissociated | unknown,
+  psychological_state_detail (string),
+  altered_state_at_onset: none | mild | moderate | deep | unknown,
+  altered_state_types (array): drowsiness | intoxication | meditation | dissociation | fever | sensory_deprivation | other
+
+Section 5 — Phenomenological Content:
+  duration_of_experience: seconds | minutes | under_one_hour | one_to_several_hours | unknown,
+  missing_time_reported: none | yes | unknown,
+  missing_time_duration (string),
+  paralysis_reported: none | partial | full | unknown,
+  perceived_physical_transport: none | yes | unknown,
+  out_of_body_sensation: none | yes | unknown,
+  floating_sensation: none | yes | unknown,
+  tunnel_or_passage_sensation: none | yes | unknown,
+  entity_presence: none | yes | unknown,
+  entity_count: one | two_to_five | more_than_five | unknown,
+  entity_types (array): grey | nordic | reptilian | shadow | robotic | insectoid | hybrid | luminous | amorphous | other | unknown,
+  entity_types_detail (string),
+  entity_communication_present: none | yes | unknown,
+  entity_communication_modality (array): verbal_auditory | telepathic | visual | gestural | emotional_transfer | other,
+  entity_communication_content_type (array): educational | warning | mission | personal | procedural | unintelligible | other,
+  educational_or_mission_messaging: none | yes | unknown,
+  medical_procedure_motif: none | yes | unknown,
+  medical_procedure_detail (string),
+  reproductive_or_sexual_motif: none | yes | unknown,
+  reproductive_motif_detail (string),
+  craft_or_vehicle_reported: none | yes | unknown,
+  craft_description (string),
+  physical_environment_changes: none | yes | unknown,
+  physical_environment_changes_detail (string),
+  event_sequence_described: none | yes | unknown,
+  event_sequence_detail (string),
+  physiological_symptoms (array): chest_pressure | visual_hallucinations | auditory_hallucinations | nausea | pain | vibration | heat_or_cold | paralysis | palpitations | other | none,
+  physiological_symptoms_detail (string),
+  emotional_valence_during_event (array): terror | anxiety | awe | calm | joy | confusion | sadness | none_reported | unknown,
+  emotional_valence_detail (string)
+
+Section 6 — Physical & Physiological Evidence:
+  physical_marks_present: none | yes | unknown,
+  physical_marks_detail (string),
+  physical_marks_medically_examined: no | yes | unknown,
+  environmental_physical_evidence: none | yes | unknown,
+  environmental_physical_evidence_detail (string),
+  independent_corroboration_present: none | yes | unknown,
+  independent_corroboration_detail (string),
+  eeg_or_neurological_data_available: no | yes | unknown,
+  eeg_data_detail (string),
+  blood_or_toxicology_data_available: no | yes | unknown,
+  blood_data_detail (string)
+
+Section 7 — Psychological Profile:
+  fantasy_proneness_assessed: no | yes | unknown,
+  fantasy_proneness_score (float),
+  fantasy_proneness_instrument (string),
+  hypnotic_suggestibility_assessed: no | yes | unknown,
+  hypnotic_suggestibility_score (float),
+  hypnotic_suggestibility_instrument (string),
+  boundary_thinness_assessed: no | yes | unknown,
+  boundary_thinness_score (float),
+  boundary_thinness_instrument (string),
+  dissociation_assessed: no | yes | unknown,
+  dissociation_score (float),
+  dissociation_instrument (string),
+  ptsd_symptoms_assessed: no | yes | unknown,
+  ptsd_symptoms_present: none | subclinical | clinical,
+  ptsd_instrument (string),
+  psychopathology_screened: no | yes | unknown,
+  psychopathology_findings: none | subclinical | clinical_diagnosis,
+  psychopathology_detail (string),
+  need_for_meaning_assessed: no | yes | unknown,
+  need_for_meaning_level: low | moderate | high,
+  self_escape_motivation_assessed: no | yes | unknown,
+  self_escape_motivation_level: low | moderate | high
+
+Section 8 — Memory & Retrieval:
+  memory_retrieval_method (array): spontaneous_recall | hypnotic_regression | guided_imagery | therapy | self_hypnosis | dream_recall | journaling | investigator_interview | unknown,
+  hypnosis_used: no | yes | unknown,
+  hypnotist_identity (string),
+  investigator_or_therapist_involved: no | yes | unknown,
+  investigator_detail (string),
+  account_consistency_over_time: not_assessed | consistent | minor_variations | significant_variations | contradictory,
+  number_of_accounts_on_record (integer)
+
+Section 9 — Aftermath:
+  positive_transformation_reported: none | yes | unknown,
+  positive_transformation_detail (string),
+  negative_psychological_aftermath: none | yes | unknown,
+  negative_aftermath_detail (string),
+  ongoing_contact_reported: none | yes | unknown,
+  ongoing_contact_detail (string),
+  changed_worldview_reported: none | yes | unknown,
+  worldview_change_detail (string),
+  sought_community_or_support: none | yes | unknown,
+  community_type (array): ufo_group | therapy | religion | online_community | research_participation | other
+
+Section 10 — Corroboration Quality:
+  corroboration_level: testimony_only | corroborated_by_witness | corroborated_by_physical_evidence | corroborated_by_both | unknown,
+  case_quality_notes (string)
+
+notes (string): free-text field for any ambiguities, caveats, or extraction \
+decisions you want to flag for the human reviewer.
+
+OUTPUT FORMAT
+Return ONLY a valid JSON object. No preamble, no markdown fences.
+All fields are optional except case_label. Omit fields (set to null) that are \
+not explicitly stated in the source text.
+"""
+
+
+def _call_claude_case(raw_text: str, source_title: str) -> CaseDraft:
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+
+    user_message = (
+        f"SOURCE: {source_title}\n\n"
+        f"TEXT:\n{raw_text}"
+    )
+
+    response = client.messages.create(
+        model=_EXTRACTION_MODEL,
+        max_tokens=8192,
+        system=_CASE_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    raw_content = response.content[0].text.strip()
+    raw_content = re.sub(r"^```(?:json)?\s*", "", raw_content)
+    raw_content = re.sub(r"\s*```$", "", raw_content)
+
+    try:
+        data = json.loads(raw_content)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Claude returned non-JSON for case extraction: {e}\nRaw: {raw_content[:500]}")
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected a JSON object for case extraction, got: {raw_content[:200]}")
+
+    case_label = data.pop("case_label", None) or source_title[:200]
+
+    _JSONB_FIELDS = {
+        "altered_state_types", "entity_types", "entity_communication_modality",
+        "entity_communication_content_type", "physiological_symptoms",
+        "emotional_valence_during_event", "memory_retrieval_method", "community_type",
+    }
+
+    clean_fields: dict = {}
+    for key, value in data.items():
+        if value is None:
+            continue
+        if key in _JSONB_FIELDS:
+            if isinstance(value, list) and value:
+                clean_fields[key] = value
+        else:
+            clean_fields[key] = value
+
+    return CaseDraft(case_label=case_label, fields=clean_fields)
+
+
 # ── DB writes ─────────────────────────────────────────────────────────────────
+
+def _insert_case(db: Session, source: Source, draft: CaseDraft) -> Case:
+    case = Case(
+        id=uuid4(),
+        source_id=source.id,
+        case_label=draft.case_label,
+        extraction_method=ExtractionMethod.AI_ASSISTED,
+        reviewed=False,
+        **draft.fields,
+    )
+    db.add(case)
+    return case
+
 
 def _insert_observations(
     db: Session,
@@ -443,6 +687,7 @@ def run_ingestion(
 
         obs_drafts: list[ObservationDraft] = []
         hyp_drafts: list[HypothesisDraft] = []
+        case_draft: Optional[CaseDraft] = None
 
         if method == IngestionMethod.AI:
             if not extraction or not extraction.raw_text.strip():
@@ -450,12 +695,18 @@ def run_ingestion(
                     "AI ingestion requires extractable text. "
                     "Upload a file with readable content first."
                 )
-            logger.info("Source %s: calling Claude for extraction", source.id)
-            obs_drafts, hyp_drafts = _call_claude(extraction.raw_text, source.title)
-            logger.info(
-                "Source %s: Claude returned %d observations, %d hypotheses",
-                source.id, len(obs_drafts), len(hyp_drafts),
-            )
+
+            if source.source_type == SourceType.CASE_REPORT:
+                logger.info("Source %s: calling Claude for case extraction", source.id)
+                case_draft = _call_claude_case(extraction.raw_text, source.title)
+                logger.info("Source %s: Claude returned case draft '%s'", source.id, case_draft.case_label)
+            else:
+                logger.info("Source %s: calling Claude for observation extraction", source.id)
+                obs_drafts, hyp_drafts = _call_claude(extraction.raw_text, source.title)
+                logger.info(
+                    "Source %s: Claude returned %d observations, %d hypotheses",
+                    source.id, len(obs_drafts), len(hyp_drafts),
+                )
 
         elif method == IngestionMethod.MANUAL and manual_observations:
             for item in manual_observations:
@@ -470,6 +721,11 @@ def run_ingestion(
                     ))
                 except (KeyError, ValueError) as e:
                     logger.warning("Skipping malformed manual observation: %s — %s", item, e)
+
+        cases_inserted = 0
+        if case_draft is not None:
+            _insert_case(db=db, source=source, draft=case_draft)
+            cases_inserted = 1
 
         obs_inserted = 0
         if obs_drafts:
@@ -493,8 +749,8 @@ def run_ingestion(
         db.commit()
 
         logger.info(
-            "Source %s: ingestion complete — method=%s, observations=%d, hypotheses=%d",
-            source.id, method.value, obs_inserted, hyp_inserted,
+            "Source %s: ingestion complete — method=%s, cases=%d, observations=%d, hypotheses=%d",
+            source.id, method.value, cases_inserted, obs_inserted, hyp_inserted,
         )
 
         return IngestionResult(
@@ -502,6 +758,7 @@ def run_ingestion(
             method=method,
             status=IngestionStatus.COMPLETE,
             raw_text=source.raw_text,
+            cases_inserted=cases_inserted,
             observations_inserted=obs_inserted,
             hypotheses_inserted=hyp_inserted,
             ocr_pages=extraction.ocr_pages if extraction else 0,
