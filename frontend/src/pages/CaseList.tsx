@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getCases } from '../api';
+import { getCases, exportCases } from '../api';
 import type { CasesParams } from '../api';
 import type { PresenceAbsenceUnknown, SleepWakeState, ParalysisExtent, CorroborationLevelV2, PsychometricPresence, RepeatExperiencer } from '../types';
 import {
@@ -62,6 +62,8 @@ export function CaseList() {
   const [corroboration, setCorroboration] = useState<CorroborationLevelV2 | ''>('');
   const [hypnosis, setHypnosis] = useState<PsychometricPresence | ''>('');
   const [repeatExp, setRepeatExp] = useState<RepeatExperiencer | ''>('');
+  const [exportConfirm, setExportConfirm] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const params: CasesParams = {
     page,
@@ -86,6 +88,22 @@ export function CaseList() {
     setPage(1);
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const { blob, snapshotDate } = await exportCases(params);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cases_export_${snapshotDate}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+      setExportConfirm(false);
+    }
+  }
+
   function resetFilters() {
     setSearch(''); setSearchInput('');
     setEntityPresence(''); setSleepWake('');
@@ -101,6 +119,16 @@ export function CaseList() {
       <Page
         title="Cases"
         subtitle={data ? `${data.total} cases in corpus` : undefined}
+        actions={
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => setExportConfirm(true)}
+            disabled={!data || data.total === 0}
+          >
+            export CSV
+          </Button>
+        }
       >
         {/* Filters */}
         <div style={{
@@ -288,6 +316,36 @@ export function CaseList() {
           </>
         )}
       </Page>
+
+      {exportConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'var(--bg-0)', border: '1px solid var(--border-dim)',
+            borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)',
+            width: 360, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          }}>
+            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+              Export cases
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 'var(--space-5)', lineHeight: 1.5 }}>
+              Export <strong>{data?.total ?? 0}</strong> case{data?.total !== 1 ? 's' : ''} as CSV
+              {hasFilters ? ' (active filters applied)' : ''}.
+              Response headers will include the corpus snapshot date and case count.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+              <Button size="sm" onClick={() => setExportConfirm(false)} disabled={exporting}>
+                cancel
+              </Button>
+              <Button size="sm" variant="primary" onClick={handleExport} disabled={exporting}>
+                {exporting ? 'exporting…' : 'export'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }
