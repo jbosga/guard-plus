@@ -244,6 +244,7 @@ Accept / reject with optional field edits
 | **Phase F** | Frontend: CaseList, CaseDetail, CaseReviewQueue, export | ✅ Done |
 | **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ✅ Done |
 | **Phase H** | Cleanup: remove dead code, update design principles, smoke test | ⬜ Next |
+| **Phase I** | Backend: user management hardening — lock registration behind superuser, admin routes | ✅ Done |
 
 ---
 
@@ -338,6 +339,17 @@ Accept / reject with optional field edits
 - `backend/app/services/ingestion.py`: added `CaseDraft` dataclass; added `_CASE_SYSTEM_PROMPT` (full case extraction prompt — 10 sections, all enum values, strict populate-only-what's-stated rules); added `_call_claude_case()` (calls Claude, strips null/empty fields, returns `CaseDraft`); added `_insert_case()` (inserts with `extraction_method=AI_ASSISTED`, `reviewed=False`); updated `run_ingestion()` dispatch — routes `case_report` sources to `_call_claude_case()`, all others to existing observation extraction path; added `cases_inserted` to `IngestionResult`
 - `backend/app/api/routes/cases.py`: added `GET /cases/review-queue` (unreviewed AI-extracted cases, oldest first); added `POST /cases/{id}/review` (accept with optional field edits → sets reviewed fields; reject → deletes draft)
 - `backend/app/api/routes/ingest.py`: AI path response message dynamically references `/cases/review-queue` or `/observations/review-queue` based on `source_type`
+
+### Phase G — Frontend: corpus-derived observation entry + staleness indicator
+- `src/components/AddObservationModal.tsx`: added `observation_source_type` toggle (Literature / Corpus-derived); corpus-derived mode hides source selector and shows `query_definition`, `analysis_tool`, `corpus_snapshot_date`, `case_count_at_snapshot`, `cases_included`, `case_filter_description`; `authored_by` visible in both modes
+- `src/pages/ObservationList.tsx`: amber `⚠ stale` badge on corpus-derived observations where `staleness_flag === true`; hover tooltip shows snapshot case count vs. current count
+
+### Phase I — Backend: user management hardening
+- `backend/app/core/security.py`: added `get_current_superuser` dependency — raises 403 if `current_user.is_superuser` is false
+- `backend/app/models/user.py`: added `Optional` import; added `UserUpdate` Pydantic schema (`is_active`, `is_superuser`)
+- `backend/app/api/routes/auth.py`: `POST /auth/register` now requires `get_current_superuser` — open registration is closed; only superusers can create accounts
+- `backend/app/api/routes/admin.py`: new file; `GET /admin/users` (list all accounts), `PATCH /admin/users/{user_id}` (toggle `is_active`/`is_superuser`), `DELETE /admin/users/{user_id}` (hard delete); all endpoints superuser-gated; self-modification and self-deletion guarded
+- `backend/app/main.py`: registered `admin` router
 
 ---
 
@@ -915,7 +927,7 @@ Add `extract_case_from_pdf(source: Source, raw_text: str, db: Session) -> Ingest
 - Returns `IngestionResult`
 
 **Case extraction prompt principles** (encode in the prompt string):
-- You are extracting structured data from a case report of an anomalous abduction experience
+- You are extracting structured data from a case report of an alien abduction experience
 - Populate ONLY fields that are explicitly stated in the source text
 - Leave all other fields as null — do not infer, interpolate, or assume
 - For multi-select fields, return a JSON array of valid enum values
