@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { login, getStats, type CorpusStats } from '../api';
 import { Button, Input } from '../components/ui';
+import { LandingPatternOverlay } from '../components/LandingPattern';
 
 function StatPill({ label, value }: { label: string; value: number | undefined }) {
   return (
@@ -65,13 +66,17 @@ export function Login() {
     }}>
       {/* Left panel */}
       <div style={{
+        position: 'relative',
         background: '#1f2328',
         display: 'flex', flexDirection: 'column',
         justifyContent: 'center',
         padding: 'var(--space-7) 72px',
         gap: 'var(--space-6)',
+        overflow: 'hidden',
+        isolation: 'isolate',
       }}>
-        <div>
+        <LandingPatternOverlay />
+        <div style={{ position: 'relative', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--space-4)' }}>
             <span style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>GUARD</span>
             <span style={{
@@ -90,7 +95,7 @@ export function Login() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', position: 'relative', zIndex: 2 }}>
           <StatPill label="sources"      value={stats?.sources}      />
           <StatPill label="cases"        value={stats?.cases}        />
           <StatPill label="observations" value={stats?.observations} />
@@ -98,6 +103,7 @@ export function Login() {
         </div>
 
         <div style={{
+          position: 'relative', zIndex: 2,
           fontSize: 11, fontFamily: 'var(--font-mono)',
           color: 'rgba(255,255,255,0.25)',
           borderTop: '1px solid rgba(255,255,255,0.08)',

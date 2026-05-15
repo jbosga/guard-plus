@@ -65,3 +65,15 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
     return user
+
+
+def get_current_superuser(
+    current_user=Depends(get_current_user),
+):
+    """FastAPI dependency: require superuser. Use in admin-only routes."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superuser privileges required",
+        )
+    return current_user

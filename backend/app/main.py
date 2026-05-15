@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.api.routes import auth, sources, observations, tags, concepts, hypotheses, epistemic_notes, frameworks
+from app.api.routes import auth, sources, observations, tags, concepts, hypotheses, epistemic_notes, frameworks, admin
 from app.api.routes import ingest, cases, export, stats
 
 settings = get_settings()
@@ -52,6 +52,7 @@ app.include_router(ingest.router, prefix=PREFIX)
 app.include_router(export.router, prefix=PREFIX)  # must be before cases to avoid /{id} shadowing /export
 app.include_router(cases.router, prefix=PREFIX)
 app.include_router(stats.router, prefix=PREFIX)
+app.include_router(admin.router, prefix=PREFIX)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

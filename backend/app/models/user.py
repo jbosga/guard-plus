@@ -6,6 +6,7 @@ scaffolded for future multi-user expansion. Not a research entity;
 lives separately from the corpus/synthesis models.
 """
 from datetime import datetime
+from typing import Optional
 from sqlalchemy import String, Boolean, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -53,3 +54,10 @@ class UserRead(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class UserUpdate(BaseModel):
+    is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
+
+    model_config = {"from_attributes": True}
