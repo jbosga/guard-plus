@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { login, getStats, type CorpusStats } from '../api';
+import { login, getStats } from '../api';
 import { Button, Input } from '../components/ui';
 import { LandingPatternOverlay } from '../components/LandingPattern';
 
