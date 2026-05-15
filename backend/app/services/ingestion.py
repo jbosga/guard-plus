@@ -181,7 +181,7 @@ def extract_text(source: Source, storage_path: str) -> ExtractionResult:
 
 _SYSTEM_PROMPT = """\
 You are a rigorous research assistant supporting a scientific study of the \
-anomalous abduction experience (AAE). Your task is to extract two things from \
+alien abduction experience (AAE). Your task is to extract two things from \
 the provided source text: (1) discrete atomic observations, and (2) hypotheses \
 the source authors themselves propose.
 
@@ -355,7 +355,7 @@ def _call_claude(
 
 _CASE_SYSTEM_PROMPT = """\
 You are a rigorous research assistant supporting a scientific study of the \
-anomalous abduction experience (AAE). Your task is to extract structured data \
+alien abduction experience (AAE). Your task is to extract structured data \
 from a case report of a single AAE account.
 
 EPISTEMOLOGICAL STANCE

@@ -3,6 +3,13 @@ import { Link, useLocation } from 'react-router-dom';
 
 const NAV_SECTIONS = [
   {
+    label: 'General',
+    items: [
+      { path: '/',       label: 'Dashboard', icon: '⊞' },
+      { path: '/about',  label: 'About',     icon: '?' },
+    ],
+  },
+  {
     label: 'Data',
     items: [
       { path: '/sources',      label: 'Sources',      icon: '📄' },
@@ -47,7 +54,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             fontSize: 15, fontWeight: 600,
             color: 'var(--text-primary)',
           }}>
-            AAE Research
+            GUARD
           </span>
           <span style={{
             fontSize: 11, fontWeight: 500,
@@ -57,7 +64,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             borderRadius: 20,
             padding: '1px 7px',
           }}>
-            KMS
+            Global UFO Abduction Research Database
           </span>
         </div>
 
@@ -98,7 +105,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {section.items.map(item => {
-                  const active = pathname.startsWith(item.path);
+                  const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
                   return (
                     <Link
                       key={item.path}
@@ -134,17 +141,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Bottom note */}
-        <div style={{
-          marginTop: 'auto',
-          padding: 'var(--space-4)',
-          borderTop: '1px solid var(--border-dim)',
-        }}>
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            Neither credulous nor dismissive.
-            Anomalies are signals.
-          </p>
-        </div>
       </aside>
 
       {/* Main */}

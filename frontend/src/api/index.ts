@@ -302,3 +302,19 @@ export async function createRelationship(payload: {
   const { data } = await client.post<ConceptRelationshipRead>('/concepts/relationships/', payload);
   return data;
 }
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+export interface CorpusStats {
+  sources: number;
+  case_reports: number;
+  cases: number;
+  observations: number;
+  hypotheses: number;
+  frameworks: number;
+}
+
+export async function getStats(): Promise<CorpusStats> {
+  const { data } = await client.get<CorpusStats>('/stats');
+  return data;
+}

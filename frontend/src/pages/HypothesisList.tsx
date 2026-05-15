@@ -116,7 +116,7 @@ export function HypothesisList() {
                   <div style={{ textAlign: 'center' }}>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 500,
-                      color: hyp.anomalous_observation_count === 0 ? 'var(--status-error)' : 'var(--status-warn)',
+                      color: 'var(--status-warn)',
                     }}>
                       {hyp.anomalous_observation_count}
                     </div>
@@ -129,20 +129,6 @@ export function HypothesisList() {
                   </div>
                 </div>
               </div>
-
-              {/* Anti-confirmation-bias warning */}
-              {hyp.anomalous_observation_count === 0 && (
-                <div style={{
-                  marginTop: 'var(--space-3)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  border: '1px solid var(--status-error)',
-                  borderRadius: 2,
-                  fontFamily: 'var(--font-mono)', fontSize: 10,
-                  color: 'var(--status-error)', letterSpacing: '0.03em',
-                }}>
-                  ⚠ No anomalous observations declared — every hypothesis must account for what it cannot explain
-                </div>
-              )}
             </Card>
           ))}
         </div>

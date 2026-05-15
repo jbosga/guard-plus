@@ -34,7 +34,7 @@ export function FrameworkList() {
     <Shell>
       <Page
         title="Frameworks"
-        subtitle="Theoretical frameworks grouping related hypotheses"
+        subtitle="Explanatory frameworks for the alien abduction experience"
         actions={
           <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
             + new framework
@@ -113,7 +113,7 @@ export function FrameworkList() {
                   <div style={{ textAlign: 'center' }}>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 500,
-                      color: fw.anomalous_hypothesis_count === 0 ? 'var(--status-error)' : 'var(--status-warn)',
+                      color: 'var(--status-warn)',
                     }}>
                       {fw.anomalous_hypothesis_count}
                     </div>
@@ -126,19 +126,6 @@ export function FrameworkList() {
                   </div>
                 </div>
               </div>
-
-              {fw.anomalous_hypothesis_count === 0 && (
-                <div style={{
-                  marginTop: 'var(--space-3)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  border: '1px solid var(--status-error)',
-                  borderRadius: 2,
-                  fontFamily: 'var(--font-mono)', fontSize: 10,
-                  color: 'var(--status-error)', letterSpacing: '0.03em',
-                }}>
-                  ⚠ No anomalous hypotheses declared — every framework should state what it cannot explain
-                </div>
-              )}
             </Card>
           ))}
         </div>

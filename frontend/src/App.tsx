@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+import { About } from './pages/About';
 import { SourceList } from './pages/SourceList';
 import { SourceDetail } from './pages/SourceDetail';
 import { ObservationList } from './pages/ObservationList';
@@ -31,7 +33,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Navigate to="/sources" replace />} />
+          <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+          <Route path="/about" element={<RequireAuth><About /></RequireAuth>} />
           <Route path="/sources" element={<RequireAuth><SourceList /></RequireAuth>} />
           <Route path="/sources/:id" element={<RequireAuth><SourceDetail /></RequireAuth>} />
           <Route path="/observations" element={<RequireAuth><ObservationList /></RequireAuth>} />
@@ -44,7 +47,7 @@ export default function App() {
           <Route path="/cases/review" element={<RequireAuth><CaseReviewQueue /></RequireAuth>} />
           <Route path="/cases/:id" element={<RequireAuth><CaseDetail /></RequireAuth>} />
           <Route path="/cases" element={<RequireAuth><CaseList /></RequireAuth>} />
-          <Route path="*" element={<Navigate to="/sources" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

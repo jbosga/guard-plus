@@ -3,15 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.api.routes import auth, sources, observations, tags, concepts, hypotheses, epistemic_notes, frameworks
-from app.api.routes import ingest, cases, export
+from app.api.routes import ingest, cases, export, stats
 
 settings = get_settings()
 
 app = FastAPI(
     redirect_slashes=False,
-    title="Abduction Research KMS",
+    title="GUARD — Global UFO Abduction Research Database",
     description=(
-        "Knowledge management system for the scientific study of the alien abduction experience. "
+        "Structured research database for the scientific study of the alien abduction experience. "
         "Epistemological stance: neither credulous nor dismissive. "
         "Anomalies are signals. Confirmation bias is countered at the schema level."
     ),
@@ -51,6 +51,7 @@ app.include_router(epistemic_notes.router, prefix=PREFIX)
 app.include_router(ingest.router, prefix=PREFIX)
 app.include_router(export.router, prefix=PREFIX)  # must be before cases to avoid /{id} shadowing /export
 app.include_router(cases.router, prefix=PREFIX)
+app.include_router(stats.router, prefix=PREFIX)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
