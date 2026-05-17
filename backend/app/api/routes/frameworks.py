@@ -122,6 +122,7 @@ def create_framework(
         notes=fw_in.notes,
         core_hypotheses=_resolve_hypotheses(fw_in.core_hypothesis_ids, db),
         anomalous_hypotheses=_resolve_hypotheses(fw_in.anomalous_hypothesis_ids, db),
+        created_by=current_user.username,
     )
     db.add(fw)
     db.commit()

@@ -458,6 +458,15 @@ export function FrameworkDetail() {
                 </p>
               )}
 
+              {fw.created_by && (
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  color: 'var(--text-dim)', marginBottom: 'var(--space-2)',
+                }}>
+                  added by {fw.created_by}
+                </div>
+              )}
+
               <div style={{
                 display: 'flex', gap: 'var(--space-5)',
                 paddingTop: 'var(--space-3)', borderTop: '1px solid var(--border-dim)',

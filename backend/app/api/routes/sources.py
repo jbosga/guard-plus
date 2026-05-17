@@ -15,7 +15,7 @@ from app.models.corpus import (
     SourceCreate, SourceUpdate, SourceList, SourceRead, ObservationRead, CaseList,
 )
 from app.models.common import Page
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_current_superuser
 from app.core.config import get_settings
 
 router = APIRouter(prefix="/sources", tags=["sources"])
@@ -123,6 +123,7 @@ def create_source(
         disciplinary_frame=source_in.disciplinary_frame,
         provenance_quality=source_in.provenance_quality,
         notes=source_in.notes,
+        created_by=current_user.username,
     )
     db.add(source)
     db.commit()
@@ -164,7 +165,7 @@ def update_source(
 def delete_source(
     source_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_superuser),
 ):
     source = _get_or_404(source_id, db)
     if source.file_ref:

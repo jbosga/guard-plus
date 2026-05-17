@@ -12,7 +12,7 @@ from app.models.enums import ObservationEpistemicStatus, ObservationSourceType, 
 from app.models.user import User
 from app.models.corpus import ObservationCreate, ObservationUpdate, ObservationRead, ObservationReview
 from app.models.common import Page
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_current_superuser
 
 router = APIRouter(prefix="/observations", tags=["observations"])
 
@@ -173,6 +173,7 @@ def create_observation(
         verbatim=obs_in.verbatim,
         page_ref=obs_in.page_ref,
         ai_extracted=obs_in.ai_extracted,
+        created_by=current_user.username,
         tags=tags,
     )
 
@@ -261,7 +262,7 @@ def review_observation(
 def delete_observation(
     observation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_superuser),
 ):
     db.delete(_get_or_404(observation_id, db))
     db.commit()

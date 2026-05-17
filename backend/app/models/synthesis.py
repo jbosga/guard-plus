@@ -141,6 +141,7 @@ class Hypothesis(Base, TimestampMixin):
     reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     reviewed_at: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     source: Mapped[Optional["Source"]] = relationship(
         "Source", foreign_keys=[source_id]
@@ -193,6 +194,7 @@ class TheoreticalFramework(Base, TimestampMixin):
     )
 
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     core_hypotheses: Mapped[List[Hypothesis]] = relationship(
         "Hypothesis", secondary=framework_core_hypotheses
@@ -332,6 +334,7 @@ class HypothesisList(BaseModel):
     source_title: Optional[str] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[str] = None
+    created_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -400,6 +403,7 @@ class TheoreticalFrameworkList(BaseModel):
     assumed_ontologies: Optional[List[AssumedOntology]] = None
     core_hypothesis_count: int = 0
     anomalous_hypothesis_count: int = 0
+    created_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

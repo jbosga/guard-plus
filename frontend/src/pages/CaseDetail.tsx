@@ -8,6 +8,7 @@ import {
   Badge, CorroborationBadge, ExtractionMethodBadge, Button,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 // ── Field style helpers ───────────────────────────────────────────────────────
 
@@ -222,6 +223,7 @@ export function CaseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const currentUser = useCurrentUser();
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -857,31 +859,34 @@ export function CaseDetail() {
               <SectionHeader>Provenance</SectionHeader>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <MetaStat label="Added" value={c.created_at.slice(0, 10)} />
+                {c.created_by && <MetaStat label="Added by" value={c.created_by} />}
                 <MetaStat label="Updated" value={c.updated_at.slice(0, 10)} />
               </div>
             </Card>
 
-            {/* Danger zone */}
-            <Card style={{ padding: 'var(--space-4)', borderColor: 'var(--status-error)44' }}>
-              <SectionHeader>Danger zone</SectionHeader>
-              {showDeleteConfirm ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                    This will permanently delete the case record. This cannot be undone.
-                  </p>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <Button size="sm" variant="danger" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
-                      {deleteMutation.isPending ? 'deleting…' : 'confirm delete'}
-                    </Button>
-                    <Button size="sm" onClick={() => setShowDeleteConfirm(false)}>cancel</Button>
+            {/* Danger zone — superuser only */}
+            {currentUser?.is_superuser && (
+              <Card style={{ padding: 'var(--space-4)', borderColor: 'var(--status-error)44' }}>
+                <SectionHeader>Danger zone</SectionHeader>
+                {showDeleteConfirm ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      This will permanently delete the case record. This cannot be undone.
+                    </p>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                      <Button size="sm" variant="danger" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+                        {deleteMutation.isPending ? 'deleting…' : 'confirm delete'}
+                      </Button>
+                      <Button size="sm" onClick={() => setShowDeleteConfirm(false)}>cancel</Button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
-                  delete case
-                </Button>
-              )}
-            </Card>
+                ) : (
+                  <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                    delete case
+                  </Button>
+                )}
+              </Card>
+            )}
 
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.04em' }}>
               {c.id}

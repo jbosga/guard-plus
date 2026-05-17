@@ -187,6 +187,7 @@ export interface SourceList {
   ingestion_status: IngestionStatus | null;
   observation_count: number;
   case_count: number;
+  created_by: string | null;
 }
 
 export interface SourceRead extends SourceList {
@@ -255,6 +256,7 @@ export interface ObservationRead {
   ai_extracted: boolean;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  created_by: string | null;
   tags: PhenomenonTagRead[];
   created_at: string;
   updated_at: string;
@@ -307,6 +309,7 @@ export interface CaseList {
   reviewed: boolean;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -461,6 +464,7 @@ export interface CaseRead {
   corroboration_level: CorroborationLevelV2 | null;
   case_quality_notes: string | null;
 
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -618,6 +622,7 @@ export interface HypothesisList {
   source_title?: string;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -687,6 +692,7 @@ export interface TheoreticalFrameworkList {
   assumed_ontologies: string[] | null;
   core_hypothesis_count: number;
   anomalous_hypothesis_count: number;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSource, getSourceObservations, getSourceCases, triggerIngest, updateSource, uploadSourceFile } from '../api';
+import { getSource, getSourceObservations, getSourceCases, triggerIngest, updateSource, uploadSourceFile, deleteSource } from '../api';
 import type { DisciplinaryFrame, ProvenanceQuality, SourceRead } from '../types';
 import { AddObservationModal } from '../components/AddObservationModal';
 import { AddCaseModal } from '../components/AddCaseModal';
@@ -13,6 +13,7 @@ import {
   Button, Card, Stat, SectionHeader, Select,
 } from '../components/ui';
 import { Shell } from '../components/Shell';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 const DISCIPLINE_OPTIONS: { value: DisciplinaryFrame; label: string }[] = [
   { value: 'neuroscience', label: 'Neuroscience' },
@@ -39,12 +40,15 @@ const PROVENANCE_OPTIONS: { value: ProvenanceQuality; label: string }[] = [
 
 export function SourceDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const qc = useQueryClient();
+  const currentUser = useCurrentUser();
   const [ingestError, setIngestError] = useState('');
   const [showAddObs, setShowAddObs] = useState(false);
   const [showAddCase, setShowAddCase] = useState(false);
   const [editing, setEditing] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: source, isLoading, isError } = useQuery({
@@ -92,6 +96,14 @@ export function SourceDetail() {
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setUploadError(msg ?? 'Upload failed');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteSource(id!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sources'] });
+      navigate('/sources');
     },
   });
 
@@ -305,6 +317,13 @@ export function SourceDetail() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <MetaRow label="Type"><SourceTypeBadge type={source.source_type} /></MetaRow>
                   <MetaRow label="Provenance"><ProvenanceBadge quality={source.provenance_quality} /></MetaRow>
+                  {source.created_by && (
+                    <MetaRow label="Added by">
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {source.created_by}
+                      </span>
+                    </MetaRow>
+                  )}
                   {source.disciplinary_frame && (
                     <MetaRow label="Discipline">
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -477,6 +496,30 @@ export function SourceDetail() {
                 </Button>
               )}
             </Card>
+
+            {/* Danger zone — superuser only */}
+            {currentUser?.is_superuser && (
+              <Card style={{ padding: 'var(--space-4)', borderColor: 'var(--status-error)44' }}>
+                <SectionHeader>Danger zone</SectionHeader>
+                {showDeleteConfirm ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      This will permanently delete the source and all linked cases/observations. This cannot be undone.
+                    </p>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                      <Button size="sm" variant="danger" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+                        {deleteMutation.isPending ? 'deleting…' : 'confirm delete'}
+                      </Button>
+                      <Button size="sm" onClick={() => setShowDeleteConfirm(false)}>cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                    delete source
+                  </Button>
+                )}
+              </Card>
+            )}
 
             {/* ID */}
             <div style={{

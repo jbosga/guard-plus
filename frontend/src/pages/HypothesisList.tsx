@@ -129,6 +129,11 @@ export function HypothesisList() {
                   </div>
                 </div>
               </div>
+              {hyp.created_by && (
+                <div style={{ marginTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
+                  added by {hyp.created_by}
+                </div>
+              )}
             </Card>
           ))}
         </div>

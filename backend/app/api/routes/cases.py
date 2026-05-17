@@ -15,7 +15,7 @@ from app.models.enums import (
 )
 from app.models.user import User
 from app.models.common import Page
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_current_superuser
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -178,7 +178,7 @@ def create_case(
     if not db.query(Source).filter(Source.id == case_in.source_id).first():
         raise HTTPException(status_code=400, detail=f"Source {case_in.source_id} not found")
 
-    case = Case(**case_in.model_dump())
+    case = Case(**case_in.model_dump(), created_by=current_user.username)
     db.add(case)
     db.commit()
     db.refresh(case)
@@ -208,7 +208,7 @@ def update_case(
 def delete_case(
     case_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_superuser),
 ):
     db.delete(_get_or_404(case_id, db))
     db.commit()

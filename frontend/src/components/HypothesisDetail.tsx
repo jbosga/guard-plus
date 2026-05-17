@@ -507,6 +507,15 @@ export function HypothesisDetail() {
                 </p>
               )}
 
+              {hyp.created_by && (
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  color: 'var(--text-dim)', marginBottom: 'var(--space-3)',
+                }}>
+                  added by {hyp.created_by}
+                </div>
+              )}
+
               {/* Falsification condition — warn if absent */}
               {falsificationEmpty ? (
                 <div style={{

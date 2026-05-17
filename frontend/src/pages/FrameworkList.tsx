@@ -126,6 +126,11 @@ export function FrameworkList() {
                   </div>
                 </div>
               </div>
+              {fw.created_by && (
+                <div style={{ marginTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
+                  added by {fw.created_by}
+                </div>
+              )}
             </Card>
           ))}
         </div>

@@ -299,7 +299,12 @@ export function CaseList() {
                         )}
                       </td>
                       <td style={{ padding: '8px 12px', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
-                        {c.created_at.slice(0, 10)}
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{c.created_at.slice(0, 10)}</div>
+                        {c.created_by && (
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, marginTop: 1 }}>
+                            by {c.created_by}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

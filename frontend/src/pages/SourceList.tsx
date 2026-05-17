@@ -201,6 +201,11 @@ export function SourceList() {
                               {source.authors.length > 2 && ' et al.'}
                             </div>
                           )}
+                          {source.created_by && (
+                            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                              added by {source.created_by}
+                            </div>
+                          )}
                         </Link>
                       </td>
                       <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>

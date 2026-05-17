@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getObservations, updateObservation } from '../api';
+import { getObservations, updateObservation, deleteObservation } from '../api';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import type { ObservationEpistemicStatus, ObservationSourceType } from '../types';
 import {
   Page, Spinner, ErrorState, EmptyState, Pagination,
@@ -36,6 +37,8 @@ export function ObservationList() {
   const [showAdd, setShowAdd] = useState(false);
 
   const qc = useQueryClient();
+  const currentUser = useCurrentUser();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const params = {
     page,
@@ -58,6 +61,14 @@ export function ObservationList() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['observations'] });
       setEditingId(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteObservation(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['observations'] });
+      setConfirmDeleteId(null);
     },
   });
 
@@ -230,6 +241,12 @@ export function ObservationList() {
                         </span>
                       )}
 
+                      {obs.created_by && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
+                          added by {obs.created_by}
+                        </span>
+                      )}
+
                       {obs.ai_extracted && !obs.reviewed_at && (
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 10,
@@ -256,6 +273,31 @@ export function ObservationList() {
                         >
                           edit
                         </button>
+                        {currentUser?.is_superuser && (
+                          confirmDeleteId === obs.id ? (
+                            <>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--status-error)' }}>delete?</span>
+                              <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', padding: '2px 4px' }}
+                              >no</button>
+                              <button
+                                onClick={() => deleteMutation.mutate(obs.id)}
+                                disabled={deleteMutation.isPending}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--status-error)', padding: '2px 4px' }}
+                              >yes</button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDeleteId(obs.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', padding: '2px 6px' }}
+                              onMouseEnter={e => (e.currentTarget.style.color = 'var(--status-error)')}
+                              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
+                            >
+                              delete
+                            </button>
+                          )
+                        )}
                         {obs.source_id && (
                           <Link
                             to={`/sources/${obs.source_id}`}

@@ -137,6 +137,7 @@ def create_hypothesis(
         supporting_observations=_resolve_observations(hyp_in.supporting_observation_ids, db),
         anomalous_observations=_resolve_observations(hyp_in.anomalous_observation_ids, db),
         competing_hypotheses=_resolve_hypotheses(hyp_in.competing_hypothesis_ids, db),
+        created_by=current_user.username,
     )
     db.add(hyp)
     db.commit()

@@ -12,6 +12,7 @@ import type {
   HypothesisList, HypothesisRead, HypothesisCreate, HypothesisUpdate, HypothesisReview,
   TheoreticalFrameworkList, TheoreticalFrameworkRead,
   TheoreticalFrameworkCreate, TheoreticalFrameworkUpdate,
+  UserRead,
 } from '../types';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -21,6 +22,11 @@ export async function login(username: string, password: string): Promise<Token> 
   const { data } = await client.post<Token>('/auth/token', form, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   });
+  return data;
+}
+
+export async function getMe(): Promise<UserRead> {
+  const { data } = await client.get<UserRead>('/auth/me');
   return data;
 }
 
@@ -115,6 +121,10 @@ export async function createObservation(payload: ObservationCreate): Promise<Obs
 export async function updateObservation(id: string, payload: ObservationUpdate): Promise<ObservationRead> {
   const { data } = await client.patch<ObservationRead>(`/observations/${id}`, payload);
   return data;
+}
+
+export async function deleteObservation(id: string): Promise<void> {
+  await client.delete(`/observations/${id}`);
 }
 
 // ── Cases ─────────────────────────────────────────────────────────────────────
