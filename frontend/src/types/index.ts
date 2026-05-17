@@ -38,6 +38,23 @@ export type ObservationEpistemicStatus =
 
 export type CasesIncluded = 'all' | 'filtered_subset';
 
+export type ObservationClaimType =
+  | 'phenomenological' | 'physiological' | 'psychological'
+  | 'behavioural' | 'demographic' | 'methodological' | 'theoretical';
+
+export type ObservationPolarity =
+  | 'positive' | 'negative' | 'null_result' | 'mixed';
+
+export type ObservationSampleSizeTier =
+  | 'single_case' | 'small' | 'medium' | 'large' | 'unspecified';
+
+export type ObservationSamplingMethod =
+  | 'convenience' | 'purposive' | 'snowball' | 'registry' | 'unspecified';
+
+export type ObservationMeasurementType =
+  | 'self_report' | 'clinical_assessment' | 'physiological_measurement'
+  | 'document_analysis' | 'observation' | 'computational' | 'unspecified';
+
 export type CorroborationLevel =
   | 'none' | 'witness' | 'physical_trace' | 'investigator' | 'multiple';
 
@@ -251,6 +268,14 @@ export interface ObservationRead {
   cases_included: CasesIncluded | null;
   case_filter_description: string | null;
   staleness_flag: boolean;
+  claim_type: ObservationClaimType | null;
+  polarity: ObservationPolarity | null;
+  sample_n: number | null;
+  sample_size_tier: ObservationSampleSizeTier | null;
+  population_description: string | null;
+  sampling_method: ObservationSamplingMethod | null;
+  measurement_type: ObservationMeasurementType | null;
+  control_group_present: boolean | null;
   verbatim: boolean;
   page_ref: string | null;
   ai_extracted: boolean;
@@ -288,8 +313,17 @@ export interface ObservationUpdate {
   case_count_at_snapshot?: number;
   cases_included?: CasesIncluded;
   case_filter_description?: string;
+  claim_type?: ObservationClaimType | null;
+  polarity?: ObservationPolarity | null;
+  sample_n?: number | null;
+  sample_size_tier?: ObservationSampleSizeTier | null;
+  population_description?: string;
+  sampling_method?: ObservationSamplingMethod | null;
+  measurement_type?: ObservationMeasurementType | null;
+  control_group_present?: boolean | null;
   verbatim?: boolean;
   page_ref?: string;
+  tag_ids?: string[];
 }
 
 // ── Cases ─────────────────────────────────────────────────────────────────────

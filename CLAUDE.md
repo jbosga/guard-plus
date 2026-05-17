@@ -245,6 +245,7 @@ Accept / reject with optional field edits
 | **Phase G** | Frontend: corpus-derived observation entry + staleness indicator | ✅ Done |
 | **Phase H** | Cleanup: remove dead code, update design principles, smoke test | ⬜ Next |
 | **Phase I** | Backend: user management hardening — lock registration behind superuser, admin routes | ✅ Done |
+| **Phase K** | ObservationDetail page + review queue upgrade | ✅ Done |
 
 ---
 
@@ -350,6 +351,17 @@ Accept / reject with optional field edits
 - `backend/app/api/routes/auth.py`: `POST /auth/register` now requires `get_current_superuser` — open registration is closed; only superusers can create accounts
 - `backend/app/api/routes/admin.py`: new file; `GET /admin/users` (list all accounts), `PATCH /admin/users/{user_id}` (toggle `is_active`/`is_superuser`), `DELETE /admin/users/{user_id}` (hard delete); all endpoints superuser-gated; self-modification and self-deletion guarded
 - `backend/app/main.py`: registered `admin` router
+
+### Phase K — ObservationDetail page + review queue upgrade
+- `backend/app/models/corpus.py`: `ObservationReview` schema extended with 11 fields (`claim_type`, `polarity`, `sample_n`, `sample_size_tier`, `population_description`, `sampling_method`, `measurement_type`, `control_group_present`, `authored_by`, `page_ref`, `verbatim`)
+- `backend/app/api/routes/observations.py`: `review_observation` handler applies all new `ObservationReview` fields via field loop
+- `frontend/src/types/index.ts`: added 5 observation enum types (`ObservationClaimType`, `ObservationPolarity`, `ObservationSampleSizeTier`, `ObservationSamplingMethod`, `ObservationMeasurementType`); added 8 classification/methodology fields to `ObservationRead`; extended `ObservationUpdate` with same fields + `tag_ids`
+- `frontend/src/components/ui.tsx`: added `ClaimTypeBadge`, `PolarityBadge`, `SampleSizeBadge`, `MeasurementTypeBadge`
+- `frontend/src/api/index.ts`: added `getObservation(id)`; extended `reviewObservation` payload type to accept all new fields
+- `frontend/src/pages/ObservationDetail.tsx`: new page at `/observations/:id`; two-column layout (main sections + sidebar); sections: Core Claim (content, epistemic status, claim type, polarity), Source & Provenance (source link, authored_by, page_ref, verbatim), Sample & Methodology (hidden for corpus_derived), Corpus-Derived Provenance (hidden for literature), Tags; section-level inline editing with save/cancel; accept/reject review actions in sidebar when `ai_extracted && !reviewed_at`; staleness warning; superuser delete
+- `frontend/src/App.tsx`: added `/observations/:id` route
+- `frontend/src/pages/ObservationList.tsx`: replaced inline edit button/`ObsEditRow` with `open →` link navigating to detail page
+- `frontend/src/pages/ReviewQueue.tsx`: added `open for editing →` link in `ObservationReviewCard`
 
 ---
 

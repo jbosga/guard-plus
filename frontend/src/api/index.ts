@@ -94,6 +94,11 @@ export async function getObservations(params: ObservationsParams = {}): Promise<
   return data;
 }
 
+export async function getObservation(id: string): Promise<ObservationRead> {
+  const { data } = await client.get<ObservationRead>(`/observations/${id}`);
+  return data;
+}
+
 export async function getSourceObservations(sourceId: string): Promise<ObservationRead[]> {
   const { data } = await client.get<ObservationRead[]>(`/sources/${sourceId}/observations`);
   return data;
@@ -108,6 +113,18 @@ export async function reviewObservation(id: string, payload: {
   accepted: boolean;
   edited_content?: string;
   epistemic_status?: ObservationEpistemicStatus;
+  claim_type?: string;
+  polarity?: string;
+  sample_n?: number;
+  sample_size_tier?: string;
+  population_description?: string;
+  sampling_method?: string;
+  measurement_type?: string;
+  control_group_present?: boolean;
+  authored_by?: string;
+  page_ref?: string;
+  verbatim?: boolean;
+  tag_ids?: string[];
 }): Promise<ObservationRead> {
   const { data } = await client.post<ObservationRead>(`/observations/${id}/review`, payload);
   return data;

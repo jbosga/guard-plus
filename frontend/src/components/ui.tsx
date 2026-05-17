@@ -1,7 +1,8 @@
 import React from 'react';
 import type {
   SourceType, ProvenanceQuality, IngestionStatus,
-  ObservationEpistemicStatus,
+  ObservationEpistemicStatus, ObservationClaimType, ObservationPolarity,
+  ObservationSampleSizeTier, ObservationMeasurementType,
   HypothesisType, HypothesisStatus, ConfidenceLevel, FrameworkStatus,
   ExtractionMethod, CorroborationLevelV2, PresenceAbsenceUnknown,
 } from '../types';
@@ -213,6 +214,58 @@ const PROV_META: Record<ProvenanceQuality, { color: string; bg: string }> = {
 export function ProvenanceBadge({ quality }: { quality: ProvenanceQuality }) {
   const { color, bg } = PROV_META[quality];
   return <Badge label={quality.replace(/_/g, ' ')} color={color} bg={bg} />;
+}
+
+// ── Observation claim type ────────────────────────────────────────────────────
+
+const CLAIM_TYPE_META: Record<ObservationClaimType, { color: string; bg: string }> = {
+  phenomenological: { color: 'var(--accent)',          bg: 'rgba(9,105,218,0.08)' },
+  psychological:    { color: 'var(--accent)',          bg: 'rgba(9,105,218,0.08)' },
+  behavioural:      { color: '#0969da',                bg: 'rgba(9,105,218,0.06)' },
+  physiological:    { color: 'var(--status-ok)',       bg: 'var(--status-ok-bg)' },
+  demographic:      { color: '#a78bfa',                bg: 'rgba(167,139,250,0.08)' },
+  methodological:   { color: 'var(--text-secondary)',  bg: 'var(--bg-2)' },
+  theoretical:      { color: '#fbbf24',                bg: 'rgba(251,191,36,0.08)' },
+};
+
+export function ClaimTypeBadge({ type }: { type: ObservationClaimType }) {
+  const { color, bg } = CLAIM_TYPE_META[type];
+  return <Badge label={type} color={color} bg={bg} />;
+}
+
+// ── Observation polarity ──────────────────────────────────────────────────────
+
+const POLARITY_META: Record<ObservationPolarity, { color: string; bg: string }> = {
+  positive:    { color: 'var(--status-ok)',    bg: 'var(--status-ok-bg)' },
+  negative:    { color: 'var(--status-error)', bg: 'var(--status-error-bg)' },
+  null_result: { color: 'var(--text-dim)',     bg: 'var(--bg-2)' },
+  mixed:       { color: 'var(--status-warn)',  bg: 'var(--status-warn-bg)' },
+};
+
+export function PolarityBadge({ polarity }: { polarity: ObservationPolarity }) {
+  const { color, bg } = POLARITY_META[polarity];
+  return <Badge label={polarity.replace('_', ' ')} color={color} bg={bg} />;
+}
+
+// ── Sample size tier ──────────────────────────────────────────────────────────
+
+const SAMPLE_SIZE_META: Record<ObservationSampleSizeTier, { color: string; bg: string }> = {
+  single_case: { color: 'var(--status-warn)',  bg: 'var(--status-warn-bg)' },
+  small:       { color: 'var(--text-secondary)', bg: 'var(--bg-2)' },
+  medium:      { color: 'var(--text-secondary)', bg: 'var(--bg-2)' },
+  large:       { color: 'var(--status-ok)',    bg: 'var(--status-ok-bg)' },
+  unspecified: { color: 'var(--text-dim)',     bg: 'var(--bg-2)' },
+};
+
+export function SampleSizeBadge({ tier }: { tier: ObservationSampleSizeTier }) {
+  const { color, bg } = SAMPLE_SIZE_META[tier];
+  return <Badge label={tier.replace('_', ' ')} color={color} bg={bg} />;
+}
+
+// ── Measurement type ──────────────────────────────────────────────────────────
+
+export function MeasurementTypeBadge({ type }: { type: ObservationMeasurementType }) {
+  return <Badge label={type.replace(/_/g, ' ')} color="var(--text-secondary)" bg="var(--bg-2)" />;
 }
 
 // ── Button ────────────────────────────────────────────────────────────────────

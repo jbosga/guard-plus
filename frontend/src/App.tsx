@@ -15,6 +15,7 @@ import { FrameworkDetail } from './pages/FrameworkDetail';
 import { CaseList } from './pages/CaseList';
 import { CaseDetail } from './pages/CaseDetail';
 import { CaseReviewQueue } from './pages/CaseReviewQueue';
+import { ObservationDetail } from './pages/ObservationDetail';
 
 
 const queryClient = new QueryClient({
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/sources" element={<RequireAuth><SourceList /></RequireAuth>} />
           <Route path="/sources/:id" element={<RequireAuth><SourceDetail /></RequireAuth>} />
           <Route path="/observations" element={<RequireAuth><ObservationList /></RequireAuth>} />
+          <Route path="/observations/:id" element={<RequireAuth><ObservationDetail /></RequireAuth>} />
           <Route path="/review" element={<RequireAuth><ReviewQueue /></RequireAuth>} />
           <Route path="/graph" element={<RequireAuth><GraphView /></RequireAuth>} />
           <Route path="/hypotheses" element={<RequireAuth><HypothesisList /></RequireAuth>} />

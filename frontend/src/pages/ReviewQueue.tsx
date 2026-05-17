@@ -362,6 +362,9 @@ function ObservationReviewCard({ obs, index, onAccept, onReject, busy }: {
         )}
         <Button size="sm" variant="primary" disabled={busy} onClick={handleAccept}>✓ accept</Button>
         <Button size="sm" variant="danger" disabled={busy} onClick={onReject}>✗ reject</Button>
+        <Link to={`/observations/${obs.id}`} style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+          open for editing →
+        </Link>
       </div>
     </Card>
   );

@@ -736,6 +736,17 @@ class ObservationReview(BaseModel):
     edited_content: Optional[str] = None
     epistemic_status: Optional[ObservationEpistemicStatus] = None
     tag_ids: Optional[List[uuid.UUID]] = None
+    claim_type: Optional[ObservationClaimType] = None
+    polarity: Optional[ObservationPolarity] = None
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[ObservationSampleSizeTier] = None
+    population_description: Optional[str] = None
+    sampling_method: Optional[ObservationSamplingMethod] = None
+    measurement_type: Optional[ObservationMeasurementType] = None
+    control_group_present: Optional[bool] = None
+    authored_by: Optional[str] = None
+    page_ref: Optional[str] = None
+    verbatim: Optional[bool] = None
 
 
 # ── Case Pydantic schemas ─────────────────────────────────────────────────────

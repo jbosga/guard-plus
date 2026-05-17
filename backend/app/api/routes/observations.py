@@ -248,6 +248,15 @@ def review_observation(
     if review.tag_ids is not None:
         obs.tags = _resolve_tags(review.tag_ids, db)
 
+    for field in (
+        "claim_type", "polarity", "sample_n", "sample_size_tier",
+        "population_description", "sampling_method", "measurement_type",
+        "control_group_present", "authored_by", "page_ref", "verbatim",
+    ):
+        value = getattr(review, field, None)
+        if value is not None:
+            setattr(obs, field, value)
+
     obs.reviewed_by = current_user.username
     obs.reviewed_at = datetime.now(timezone.utc).isoformat()
 

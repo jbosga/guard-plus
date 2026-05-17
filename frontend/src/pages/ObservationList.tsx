@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getObservations, updateObservation, deleteObservation } from '../api';
+import { getObservations, deleteObservation } from '../api';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import type { ObservationEpistemicStatus, ObservationSourceType } from '../types';
 import {
@@ -33,7 +33,6 @@ export function ObservationList() {
   const [observationSourceType, setObservationSourceType] = useState<ObservationSourceType | ''>('');
   const [aiExtracted, setAiExtracted] = useState<'' | 'true' | 'false'>('');
   const [unreviewed, setUnreviewed] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
   const qc = useQueryClient();
@@ -53,15 +52,6 @@ export function ObservationList() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['observations', params],
     queryFn: () => getObservations(params),
-  });
-
-  const mutation = useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; epistemic_status?: ObservationEpistemicStatus }) =>
-      updateObservation(id, payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['observations'] });
-      setEditingId(null);
-    },
   });
 
   const deleteMutation = useMutation({
@@ -175,17 +165,7 @@ export function ObservationList() {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {data.items.map((obs, i) =>
-                editingId === obs.id ? (
-                  <ObsEditRow
-                    key={obs.id}
-                    obs={obs}
-                    index={i}
-                    busy={mutation.isPending}
-                    onSave={(payload) => mutation.mutate({ id: obs.id, ...payload })}
-                    onCancel={() => setEditingId(null)}
-                  />
-                ) : (
+              {data.items.map((obs, i) => (
                   <div
                     key={obs.id}
                     className="fade-in"
@@ -260,19 +240,17 @@ export function ObservationList() {
                       )}
 
                       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                        <button
-                          onClick={() => setEditingId(obs.id)}
+                        <Link
+                          to={`/observations/${obs.id}`}
                           style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
                             fontFamily: 'var(--font-mono)', fontSize: 10,
-                            color: 'var(--text-dim)', padding: '2px 6px',
-                            borderRadius: 'var(--radius-sm)',
+                            color: 'var(--text-dim)', textDecoration: 'none', padding: '2px 6px',
                           }}
                           onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
                           onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
                         >
-                          edit
-                        </button>
+                          open →
+                        </Link>
                         {currentUser?.is_superuser && (
                           confirmDeleteId === obs.id ? (
                             <>
@@ -360,8 +338,7 @@ export function ObservationList() {
                       </div>
                     )}
                   </div>
-                )
-              )}
+              ))}
             </div>
 
             <Pagination page={data.page} pages={data.pages} total={data.total} onPage={setPage} />
@@ -383,84 +360,3 @@ export function ObservationList() {
   );
 }
 
-// ── Inline edit row ───────────────────────────────────────────────────────────
-
-interface ObsEditRowProps {
-  obs: {
-    id: string;
-    content: string;
-    epistemic_status: ObservationEpistemicStatus;
-    verbatim: boolean;
-    page_ref: string | null;
-    source_id: string | null;
-  };
-  index: number;
-  busy: boolean;
-  onSave: (payload: { epistemic_status: ObservationEpistemicStatus }) => void;
-  onCancel: () => void;
-}
-
-function ObsEditRow({ obs, index, busy, onSave, onCancel }: ObsEditRowProps) {
-  const [epistemicStatus, setEpistemicStatus] = useState<ObservationEpistemicStatus>(obs.epistemic_status);
-
-  return (
-    <div
-      className="fade-in"
-      style={{
-        padding: 'var(--space-4) 0',
-        borderBottom: '1px solid var(--border-dim)',
-        animationDelay: `${index * 15}ms`,
-      }}
-    >
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-        marginBottom: 'var(--space-3)', flexWrap: 'wrap',
-      }}>
-        <Select
-          options={EP_OPTIONS}
-          value={epistemicStatus}
-          onChange={e => setEpistemicStatus(e.target.value as ObservationEpistemicStatus)}
-          style={{ fontSize: 11 }}
-        />
-        {obs.page_ref && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
-            p.{obs.page_ref}
-          </span>
-        )}
-        {obs.source_id && (
-          <Link
-            to={`/sources/${obs.source_id}`}
-            style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}
-          >
-            → source
-          </Link>
-        )}
-      </div>
-
-      <p style={{
-        fontSize: 13,
-        fontFamily: obs.verbatim ? 'var(--font-mono)' : 'var(--font-sans)',
-        color: 'var(--text-primary)',
-        lineHeight: 1.65,
-        maxWidth: 860,
-        marginBottom: 'var(--space-3)',
-      }}>
-        {obs.content}
-      </p>
-
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={busy}
-          onClick={() => onSave({ epistemic_status: epistemicStatus })}
-        >
-          save
-        </Button>
-        <Button size="sm" onClick={onCancel} disabled={busy}>
-          cancel
-        </Button>
-      </div>
-    </div>
-  );
-}
