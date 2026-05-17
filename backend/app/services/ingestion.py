@@ -86,6 +86,16 @@ class ObservationDraft:
     epistemic_status: ObservationEpistemicStatus = ObservationEpistemicStatus.REPORTED
     page_ref: Optional[str] = None
     verbatim: bool = False
+    # Classification — populated by AI for literature sources
+    claim_type: Optional[str] = None
+    polarity: Optional[str] = None
+    # Sample & methodology — literature only; AI leaves null when not applicable
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[str] = None
+    population_description: Optional[str] = None
+    sampling_method: Optional[str] = None
+    measurement_type: Optional[str] = None
+    control_group_present: Optional[bool] = None
 
 
 @dataclass
@@ -216,6 +226,43 @@ epistemic_status — confidence level of the observation:
   artefactual   — likely an artifact of the collection method
   retracted     — subsequently withdrawn
 
+claim_type — the nature of the claim (null if genuinely ambiguous):
+  phenomenological — what the experience is like (perceptual, narrative, subjective)
+  physiological    — body or biology-level finding
+  psychological    — mental, cognitive, or emotional finding
+  behavioural      — actions or conduct patterns
+  demographic      — who experiencers are (age, sex, occupation, etc.)
+  methodological   — about how the study was conducted
+  theoretical      — explanatory or interpretive, not directly empirical
+
+polarity — the direction of the finding (null if genuinely ambiguous):
+  positive     — X is present, elevated, or confirmed
+  negative     — X is absent, not significant, or disconfirmed
+  null_result  — no difference or effect found
+  mixed        — inconsistent or context-dependent findings
+
+The following fields describe the study's sample and methodology. Populate them
+when the source provides the relevant information; set to null otherwise. Do not
+infer or estimate.
+
+sample_n — integer; number of cases or participants the observation is drawn from
+
+sample_size_tier — derived from sample_n if known, otherwise inferred from context:
+  single_case | small (<20) | medium (20-100) | large (>100) | unspecified
+
+population_description — brief free-text description of who the sample consists of
+  (e.g. "abduction claimants recruited via MUFON", "hypnotic regression subjects")
+
+sampling_method — how participants were recruited:
+  convenience | purposive | snowball | registry | unspecified
+
+measurement_type — how the observation was produced:
+  self_report | clinical_assessment | physiological_measurement |
+  document_analysis | observation | computational | unspecified
+
+control_group_present — true if a comparison/control group is present; false if
+  explicitly stated there is none; null if not mentioned
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PART 2 — HYPOTHESES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -268,7 +315,15 @@ markdown fences.
       "content": (string, required),
       "epistemic_status": (string, required),
       "page_ref": (string or null),
-      "verbatim": (boolean)
+      "verbatim": (boolean),
+      "claim_type": (string or null),
+      "polarity": (string or null),
+      "sample_n": (integer or null),
+      "sample_size_tier": (string or null),
+      "population_description": (string or null),
+      "sampling_method": (string or null),
+      "measurement_type": (string or null),
+      "control_group_present": (boolean or null)
     }
   ],
   "hypotheses": [
@@ -327,6 +382,14 @@ def _call_claude(
                 ),
                 page_ref=str(item["page_ref"]) if item.get("page_ref") else None,
                 verbatim=bool(item.get("verbatim", False)),
+                claim_type=item.get("claim_type") or None,
+                polarity=item.get("polarity") or None,
+                sample_n=int(item["sample_n"]) if item.get("sample_n") is not None else None,
+                sample_size_tier=item.get("sample_size_tier") or None,
+                population_description=str(item["population_description"]).strip() if item.get("population_description") else None,
+                sampling_method=item.get("sampling_method") or None,
+                measurement_type=item.get("measurement_type") or None,
+                control_group_present=bool(item["control_group_present"]) if item.get("control_group_present") is not None else None,
             ))
         except (KeyError, ValueError) as e:
             logger.warning("Skipping malformed observation at index %d: %s — %s", i, item, e)
@@ -609,6 +672,14 @@ def _insert_observations(
             ingestion_method=method,
             reviewed_by=reviewer if method == IngestionMethod.MANUAL else None,
             reviewed_at=now if method == IngestionMethod.MANUAL else None,
+            claim_type=draft.claim_type,
+            polarity=draft.polarity,
+            sample_n=draft.sample_n,
+            sample_size_tier=draft.sample_size_tier,
+            population_description=draft.population_description,
+            sampling_method=draft.sampling_method,
+            measurement_type=draft.measurement_type,
+            control_group_present=draft.control_group_present,
         )
         db.add(obs)
         inserted += 1

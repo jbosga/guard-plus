@@ -147,6 +147,44 @@ class ObservationSourceType(str, enum.Enum):
     LITERATURE = "literature"
     CORPUS_DERIVED = "corpus_derived"
 
+class ObservationClaimType(str, enum.Enum):
+    PHENOMENOLOGICAL = "phenomenological"
+    PHYSIOLOGICAL    = "physiological"
+    PSYCHOLOGICAL    = "psychological"
+    BEHAVIOURAL      = "behavioural"
+    DEMOGRAPHIC      = "demographic"
+    METHODOLOGICAL   = "methodological"
+    THEORETICAL      = "theoretical"
+
+class ObservationPolarity(str, enum.Enum):
+    POSITIVE    = "positive"
+    NEGATIVE    = "negative"
+    NULL_RESULT = "null_result"
+    MIXED       = "mixed"
+
+class ObservationSampleSizeTier(str, enum.Enum):
+    SINGLE_CASE = "single_case"
+    SMALL       = "small"
+    MEDIUM      = "medium"
+    LARGE       = "large"
+    UNSPECIFIED = "unspecified"
+
+class ObservationSamplingMethod(str, enum.Enum):
+    CONVENIENCE = "convenience"
+    PURPOSIVE   = "purposive"
+    SNOWBALL    = "snowball"
+    REGISTRY    = "registry"
+    UNSPECIFIED = "unspecified"
+
+class ObservationMeasurementType(str, enum.Enum):
+    SELF_REPORT               = "self_report"
+    CLINICAL_ASSESSMENT       = "clinical_assessment"
+    PHYSIOLOGICAL_MEASUREMENT = "physiological_measurement"
+    DOCUMENT_ANALYSIS         = "document_analysis"
+    OBSERVATION               = "observation"
+    COMPUTATIONAL             = "computational"
+    UNSPECIFIED               = "unspecified"
+
 # ── Source layer ──────────────────────────────────────────────────────────────
 
 class SourceType(str, enum.Enum):

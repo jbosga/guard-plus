@@ -22,6 +22,8 @@ from app.db.base import Base, TimestampMixin
 from app.models.enums import (
     SourceType, DisciplinaryFrame, ProvenanceQuality,
     ObservationEpistemicStatus, ObservationSourceType, CasesIncluded,
+    ObservationClaimType, ObservationPolarity, ObservationSampleSizeTier,
+    ObservationSamplingMethod, ObservationMeasurementType,
     TagCategory,
     IngestionStatus, IngestionMethod,
     # Case enums
@@ -100,6 +102,7 @@ class Source(Base, TimestampMixin):
         nullable=True,
     )
     ingestion_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     observations: Mapped[List["Observation"]] = relationship(
         "Observation", back_populates="source", cascade="all, delete-orphan"
@@ -454,6 +457,8 @@ class Case(Base, TimestampMixin):
     )
     case_quality_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    created_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
     # Review fields
     reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
@@ -494,6 +499,38 @@ class Observation(Base, TimestampMixin):
     )
     case_filter_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Classification fields — applicable to both literature and corpus_derived
+    claim_type: Mapped[Optional[ObservationClaimType]] = mapped_column(
+        Enum(ObservationClaimType, name="observation_claim_type_enum", create_type=False,
+             values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    polarity: Mapped[Optional[ObservationPolarity]] = mapped_column(
+        Enum(ObservationPolarity, name="observation_polarity_enum", create_type=False,
+             values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+
+    # Sample & methodology fields — literature observations only; leave null for corpus_derived
+    sample_n: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    sample_size_tier: Mapped[Optional[ObservationSampleSizeTier]] = mapped_column(
+        Enum(ObservationSampleSizeTier, name="observation_sample_size_tier_enum", create_type=False,
+             values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    population_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sampling_method: Mapped[Optional[ObservationSamplingMethod]] = mapped_column(
+        Enum(ObservationSamplingMethod, name="observation_sampling_method_enum", create_type=False,
+             values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    measurement_type: Mapped[Optional[ObservationMeasurementType]] = mapped_column(
+        Enum(ObservationMeasurementType, name="observation_measurement_type_enum", create_type=False,
+             values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    control_group_present: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
     verbatim: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     page_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     ingestion_method: Mapped[Optional[IngestionMethod]] = mapped_column(
@@ -504,6 +541,7 @@ class Observation(Base, TimestampMixin):
     reviewed_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     reviewed_at: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     ai_extracted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     source: Mapped[Optional["Source"]] = relationship("Source", back_populates="observations")
     tags: Mapped[List["PhenomenonTag"]] = relationship("PhenomenonTag", secondary=observation_tags)
@@ -582,6 +620,7 @@ class SourceList(BaseModel):
     ingestion_status: Optional[IngestionStatus] = None
     observation_count: int = 0
     case_count: int = 0
+    created_by: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -610,6 +649,16 @@ class ObservationCreate(BaseModel):
     case_count_at_snapshot: Optional[int] = None
     cases_included: Optional[CasesIncluded] = None
     case_filter_description: Optional[str] = None
+    # Classification — both source types
+    claim_type: Optional[ObservationClaimType] = None
+    polarity: Optional[ObservationPolarity] = None
+    # Sample & methodology — literature only; leave null for corpus_derived
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[ObservationSampleSizeTier] = None
+    population_description: Optional[str] = None
+    sampling_method: Optional[ObservationSamplingMethod] = None
+    measurement_type: Optional[ObservationMeasurementType] = None
+    control_group_present: Optional[bool] = None
     verbatim: bool = False
     page_ref: Optional[str] = None
     tag_ids: List[uuid.UUID] = []
@@ -628,6 +677,16 @@ class ObservationUpdate(BaseModel):
     case_count_at_snapshot: Optional[int] = None
     cases_included: Optional[CasesIncluded] = None
     case_filter_description: Optional[str] = None
+    # Classification — both source types
+    claim_type: Optional[ObservationClaimType] = None
+    polarity: Optional[ObservationPolarity] = None
+    # Sample & methodology — literature only; leave null for corpus_derived
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[ObservationSampleSizeTier] = None
+    population_description: Optional[str] = None
+    sampling_method: Optional[ObservationSamplingMethod] = None
+    measurement_type: Optional[ObservationMeasurementType] = None
+    control_group_present: Optional[bool] = None
     verbatim: Optional[bool] = None
     page_ref: Optional[str] = None
     tag_ids: Optional[List[uuid.UUID]] = None
@@ -648,12 +707,23 @@ class ObservationRead(BaseModel):
     cases_included: Optional[CasesIncluded] = None
     case_filter_description: Optional[str] = None
     staleness_flag: bool = False
+    # Classification — both source types
+    claim_type: Optional[ObservationClaimType] = None
+    polarity: Optional[ObservationPolarity] = None
+    # Sample & methodology — literature only; null for corpus_derived
+    sample_n: Optional[int] = None
+    sample_size_tier: Optional[ObservationSampleSizeTier] = None
+    population_description: Optional[str] = None
+    sampling_method: Optional[ObservationSamplingMethod] = None
+    measurement_type: Optional[ObservationMeasurementType] = None
+    control_group_present: Optional[bool] = None
     verbatim: bool
     page_ref: Optional[str] = None
     ingestion_method: Optional[IngestionMethod] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[str] = None
     ai_extracted: bool
+    created_by: Optional[str] = None
     tags: List[PhenomenonTagRead] = []
     created_at: datetime
     updated_at: datetime
@@ -954,6 +1024,7 @@ class CaseList(BaseModel):
     reviewed: bool = False
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+    created_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -1101,6 +1172,7 @@ class CaseRead(BaseModel):
     reviewed: bool = False
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+    created_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
